@@ -1,1311 +1,4 @@
-                     
-{ symbol: 'NEAR', name: 'NEAR', address: '0x1Fa4a73a3F0133f0025378af00236f3aBDEE5D63', rank: 31 },
-            { symbol: 'ALGO', name: 'Algorand', address: '0xa1faa15655B0e7b6B6470ED3d096390e6aD93Abb', rank: 32 },
-            { symbol: 'AAVE', name: 'Aave', address: '0xfb6115445Bff7b52FeB98650C87f44907E58f802', rank: 33 },
-            { symbol: 'SXP', name: 'Swipe', address: '0x47BEAd2563dCBf3bF2c9407fEa4dC236fAbA485A', rank: 34 },
-            { symbol: 'SUSHI', name: 'SushiSwap', address: '0x947950BcC74888a40Ffa2593C5798F11Fc9124C4', rank: 35 },
-            { symbol: 'COMP', name: 'Compound', address: '0x52CE071Bd9b1C4B00A0b92D298c512478CaD67e8', rank: 36 },
-            { symbol: 'YFI', name: 'yearn', address: '0x88f1A5ae2A3BF98AEAF342D26B30a79438c9142e', rank: 37 },
-            { symbol: 'SNX', name: 'Synthetix', address: '0x9Ac983826058b8a9C7Aa1C9171441191232E8404', rank: 38 },
-            { symbol: 'MKR', name: 'Maker', address: '0x5f0Da599BB2ccCfcf6Fdfd7D81743B6020864350', rank: 39 },
-            { symbol: 'DAI', name: 'Dai', address: '0x1AF3F329e8BE154074D8769D1FFa4eE058B1DBc3', rank: 40 },
-            { symbol: 'CREAM', name: 'Cream', address: '0xd4CB328A82bDf5f03eB737f37Fa6B370aef3e888', rank: 41 },
-            { symbol: 'DODO', name: 'DODO', address: '0x67ee3Cb086F8a16f34beE3ca72FAD36F7Db929e2', rank: 42 },
-            { symbol: 'EGG', name: 'Goose', address: '0xF952Fc3ca7325Cc27D15885d37117676d25BfdA6', rank: 43 },
-            { symbol: 'EGLD', name: 'Elrond', address: '0xbF7c81FFF98BbE61B40Ed186e4AfD6DDd01337fe', rank: 44 },
-            { symbol: 'EOS', name: 'EOS', address: '0x56b6fB708fC5732DEC1Afc8D8556423A2EDcCbD6', rank: 45 },
-            { symbol: 'FTM', name: 'Fantom', address: '0xAD29AbB318791D579433D831ed122aFeAf29dcfe', rank: 46 },
-            { symbol: 'INJ', name: 'Injective', address: '0xa2B726B1145A4773F68593CF171187d8EBe4d495', rank: 47 },
-            { symbol: 'SHIB', name: 'Shiba', address: '0x2859e4544C4bB03966803b044A93563Bd2D0DD4D', rank: 48 },
-            { symbol: 'SAND', name: 'Sandbox', address: '0x67b725d7e342d7B611fa85e859Df9697D9378B2e', rank: 49 },
-            { symbol: 'MANA', name: 'Decentraland', address: '0x26433c8127d9b4e9B71Eaa15111DF99Ea2EeB2f8', rank: 50 }
-        ];
-
-        const history = [];
-
-        function selectMode(mode) {
-            currentMode = mode;
-            
-            if (mode === 'metamask') {
-                document.getElementById('metaMaskModeBtn').classList.add('active');
-                document.getElementById('privateKeyModeBtn').classList.remove('active');
-                document.getElementById('metaMaskSection').style.display = 'block';
-                document.getElementById('privateKeySection').style.display = 'none';
-            } else {
-                document.getElementById('metaMaskModeBtn').classList.remove('active');
-                document.getElementById('privateKeyModeBtn').classList.add('active');
-                document.getElementById('metaMaskSection').style.display = 'none';
-                document.getElementById('privateKeySection').style.display = 'block';
-            }
-            
-            document.getElementById('connectedContent').style.display = 'none';
-            if (dcaConfig.active) stopDCA();
-        }
-
-        async function connectWallet() {
-            if (typeof window.ethereum === 'undefined') {
-                alert('❌ MetaMask non installé');
-                window.open('https://metamask.io/download/', '_blank');
-                return;
-            }
-            
-            try {
-                const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-                userAccount = accounts[0];
-                
-                const chainId = await window.ethereum.request({ method: 'eth_chainId' });
-                
-                if (chainId !== '0x38') {
-                    alert('⚠️ Passez sur BSC');
-                    await switchToBSC();
-                    return;
-                }
-                
-                document.getElementById('walletStatus').className = 'status connected';
-                document.getElementById('walletStatus').textContent = 'Connecté';
-                document.getElementById('walletAddress').textContent = userAccount.substring(0, 6) + '...' + userAccount.substring(38);
-                document.getElementById('networkBadge').style.display = 'inline-block';
-                document.getElementById('networkBadge').className = 'network-badge network-bsc';
-                document.getElementById('networkBadge').textContent = 'BSC';
-                document.getElementById('connectBtn').textContent = 'Déconnecter';
-                document.getElementById('connectBtn').onclick = disconnectWallet;
-                document.getElementById('connectedContent').style.display = 'block';
-                
-                await updateBalances();
-                loadCryptoLists();
-                
-                window.ethereum.on('accountsChanged', handleAccountsChanged);
-                window.ethereum.on('chainChanged', () => window.location.reload());
-                
-            } catch (error) {
-                console.error('Erreur:', error);
-                alert('❌ Erreur: ' + error.message);
-            }
-        }
-
-        async function switchToBSC() {
-            try {
-                await window.ethereum.request({
-                    method: 'wallet_switchEthereumChain',
-                    params: [{ chainId: '0x38' }],
-                });
-            } catch (error) {
-                if (error.code === 4902) {
-                    await window.ethereum.request({
-                        method: 'wallet_addEthereumChain',
-                        params: [{
-                            chainId: '0x38',
-                            chainName: 'BNB Smart Chain',
-                            nativeCurrency: { name: 'BNB', symbol: 'BNB', decimals: 18 },
-                            rpcUrls: ['https://bsc-dataseed1.binance.org'],
-                            blockExplorerUrls: ['https://bscscan.com']
-                        }]
-                    });
-                }
-            }
-        }
-
-        function disconnectWallet() {
-            userAccount = null;
-            document.getElementById('walletStatus').className = 'status disconnected';
-            document.getElementById('walletStatus').textContent = 'Non connecté';
-            document.getElementById('connectedContent').style.display = 'none';
-            document.getElementById('connectBtn').textContent = 'Connecter MetaMask';
-            document.getElementById('connectBtn').onclick = connectWallet;
-            if (dcaConfig.active) stopDCA();
-        }
-
-        function handleAccountsChanged(accounts) {
-            if (accounts.length === 0) {
-                disconnectWallet();
-            } else {
-                userAccount = accounts[0];
-                updateBalances();
-            }
-        }
-
-        async function connectWithPrivateKey() {
-            const pkInput = document.getElementById('privateKeyInput').value.trim();
-            
-            if (!pkInput) {
-                alert('❌ Entrez votre clé privée');
-                return;
-            }
-            
-            try {
-                const privateKey = pkInput.startsWith('0x') ? pkInput : '0x' + pkInput;
-                
-                if (privateKey.length !== 66) {
-                    alert('❌ Clé privée invalide (doit faire 64 caractères hex + 0x)');
-                    return;
-                }
-                
-                provider = new ethers.providers.JsonRpcProvider(BSC_RPC);
-                privateKeyWallet = new ethers.Wallet(privateKey, provider);
-                userAccount = privateKeyWallet.address;
-                
-                console.log('✅ Connecté:', userAccount);
-                
-                document.getElementById('pkAddress').textContent = userAccount.substring(0, 6) + '...' + userAccount.substring(38);
-                document.getElementById('pkWalletInfo').style.display = 'block';
-                document.getElementById('connectedContent').style.display = 'block';
-                
-                await updateBalances();
-                loadCryptoLists();
-                
-                alert('✅ Connecté avec clé privée\n\nMode AUTOMATIQUE activé - Les transactions DCA s\'exécuteront sans confirmation !');
-                
-            } catch (error) {
-                console.error('Erreur:', error);
-                alert('❌ Clé privée invalide: ' + error.message);
-            }
-        }
-
-        function clearPrivateKey() {
-            if (confirm('Effacer la clé privée de la mémoire ?')) {
-                privateKeyWallet = null;
-                provider = null;
-                userAccount = null;
-                document.getElementById('privateKeyInput').value = '';
-                document.getElementById('pkWalletInfo').style.display = 'none';
-                document.getElementById('connectedContent').style.display = 'none';
-                if (dcaConfig.active) stopDCA();
-                alert('✅ Clé effacée');
-            }
-        }
-
-        async function updateBalances() {
-            if (!userAccount) return;
-            
-            try {
-                if (currentMode === 'metamask') {
-                    const usdtData = '0x70a08231' + userAccount.substring(2).padStart(64, '0');
-                    const usdtBalance = await window.ethereum.request({
-                        method: 'eth_call',
-                        params: [{ to: USDT_ADDRESS, data: usdtData }, 'latest']
-                    });
-                    document.getElementById('usdtBalance').textContent = (parseInt(usdtBalance, 16) / 1e18).toFixed(2);
-                    
-                    const bnbBalance = await window.ethereum.request({
-                        method: 'eth_getBalance',
-                        params: [userAccount, 'latest']
-                    });
-                    const bnbAmount = (parseInt(bnbBalance, 16) / 1e18).toFixed(4);
-                    document.getElementById('bnbBalance').textContent = bnbAmount;
-                } else {
-                    const usdtContract = new ethers.Contract(
-                        USDT_ADDRESS,
-                        ['function balanceOf(address) view returns (uint256)'],
-                        provider
-                    );
-                    const usdtBal = await usdtContract.balanceOf(userAccount);
-                    document.getElementById('usdtBalance').textContent = ethers.utils.formatEther(usdtBal);
-                    
-                    const bnbBal = await provider.getBalance(userAccount);
-                    document.getElementById('bnbBalance').textContent = ethers.utils.formatEther(bnbBal);
-                }
-            } catch (error) {
-                console.error('Erreur balance:', error);
-            }
-        }
-
-        function filterDCACryptos() {
-            const search = document.getElementById('dcaCryptoSearch').value.toLowerCase();
-            const select = document.getElementById('cryptoSelect');
-            for (let i = 1; i < select.options.length; i++) {
-                const option = select.options[i];
-                option.style.display = option.textContent.toLowerCase().includes(search) ? '' : 'none';
-            }
-        }
-
-        function filterSwapFromTokens() {
-            const search = document.getElementById('swapFromSearch').value.toLowerCase();
-            const select = document.getElementById('swapFromToken');
-            for (let i = 1; i < select.options.length; i++) {
-                const option = select.options[i];
-                option.style.display = option.textContent.toLowerCase().includes(search) ? '' : 'none';
-            }
-        }
-
-        function filterSwapToTokens() {
-            const search = document.getElementById('swapToSearch').value.toLowerCase();
-            const select = document.getElementById('swapToToken');
-            for (let i = 1; i < select.options.length; i++) {
-                const option = select.options[i];
-                option.style.display = option.textContent.toLowerCase().includes(search) ? '' : 'none';
-            }
-        }
-
-        function updateDCAType() {
-            dcaType = document.getElementById('dcaTypeSelect').value;
-            
-            if (dcaType === 'sell') {
-                document.getElementById('cryptoSelectLabel').textContent = 'Crypto à vendre';
-                document.getElementById('amountLabel').textContent = 'Montant (Crypto)';
-                document.getElementById('buyNowBtn').innerHTML = '⚡ Vendre';
-                document.getElementById('amountInput').value = '0.1';
-            } else {
-                document.getElementById('cryptoSelectLabel').textContent = 'Crypto à acheter';
-                document.getElementById('amountLabel').textContent = 'Montant (USDT)';
-                document.getElementById('buyNowBtn').innerHTML = '⚡ Acheter';
-                document.getElementById('amountInput').value = '10';
-            }
-        }
-
-        function loadCryptoLists() {
-            const dcaSelect = document.getElementById('cryptoSelect');
-            dcaSelect.innerHTML = '<option value="">-- Sélectionner --</option>';
-            
-            TOP_20_CRYPTOS.forEach(crypto => {
-                const option = document.createElement('option');
-                option.value = crypto.address;
-                option.textContent = `${crypto.rank}. ${crypto.symbol} - ${crypto.name}`;
-                option.dataset.crypto = JSON.stringify(crypto);
-                dcaSelect.appendChild(option);
-            });
-
-            const swapFromSelect = document.getElementById('swapFromToken');
-            const swapToSelect = document.getElementById('swapToToken');
-            
-            swapFromSelect.innerHTML = '<option value="">-- Sélectionner --</option>';
-            swapToSelect.innerHTML = '<option value="">-- Sélectionner --</option>';
-            
-            TOP_50_SWAP_TOKENS.forEach(token => {
-                const opt1 = document.createElement('option');
-                opt1.value = token.address;
-                opt1.textContent = `${token.rank}. ${token.symbol}`;
-                swapFromSelect.appendChild(opt1);
-
-                const opt2 = document.createElement('option');
-                opt2.value = token.address;
-                opt2.textContent = `${token.rank}. ${token.symbol}`;
-                swapToSelect.appendChild(opt2);
-            });
-        }
-
-        function updateCryptoInfo() {
-            const select = document.getElementById('cryptoSelect');
-            const option = select.options[select.selectedIndex];
-            
-            if (option.value) {
-                selectedCrypto = JSON.parse(option.dataset.crypto);
-                document.getElementById('cryptoInfo').style.display = 'block';
-                document.getElementById('cryptoDescription').textContent = 
-                    dcaType === 'sell' ? 
-                    `Vente ${selectedCrypto.symbol} → USDT` : 
-                    `Achat USDT → ${selectedCrypto.symbol}`;
-            } else {
-                selectedCrypto = null;
-                document.getElementById('cryptoInfo').style.display = 'none';
-            }
-        }
-
-        function executeNowManual() {
-            if (!selectedCrypto) {
-                alert('Sélectionnez une crypto');
-                return;
-            }
-            
-            const amount = parseFloat(document.getElementById('amountInput').value);
-            if (!amount || amount <= 0) {
-                alert('Montant invalide');
-                return;
-            }
-            
-            const slippage = parseFloat(document.getElementById('slippageInput').value);
-            
-            if (dcaType === 'sell') {
-                executeSale(amount, slippage, selectedCrypto);
-            } else {
-                executePurchase(amount, slippage, selectedCrypto);
-            }
-        }
-
-        async function executePurchase(amount, slippage, crypto) {
-            try {
-                console.log('🚀 Achat:', amount, 'USDT →', crypto.symbol);
-                
-                let bnbBalance;
-                if (currentMode === 'metamask') {
-                    const bal = await window.ethereum.request({
-                        method: 'eth_getBalance',
-                        params: [userAccount, 'latest']
-                    });
-                    bnbBalance = parseInt(bal, 16) / 1e18;
-                } else {
-                    const bal = await provider.getBalance(userAccount);
-                    bnbBalance = parseFloat(ethers.utils.formatEther(bal));
-                }
-                
-                if (bnbBalance < 0.005) {
-                    alert('❌ Pas assez de BNB (besoin ~0.005)');
-                    return;
-                }
-                
-                const amountWei = BigInt(Math.floor(amount * 1e18));
-                
-                let usdtBalance;
-                if (currentMode === 'metamask') {
-                    const data = '0x70a08231' + userAccount.substring(2).padStart(64, '0');
-                    const bal = await window.ethereum.request({
-                        method: 'eth_call',
-                        params: [{ to: USDT_ADDRESS, data: data }, 'latest']
-                    });
-                    usdtBalance = BigInt(bal);
-                } else {
-                    const contract = new ethers.Contract(
-                        USDT_ADDRESS,
-                        ['function balanceOf(address) view returns (uint256)'],
-                        provider
-                    );
-                    const bal = await contract.balanceOf(userAccount);
-                    usdtBalance = BigInt(bal.toString());
-                }
-                
-                if (usdtBalance < amountWei) {
-                    alert('❌ Pas assez de USDT');
-                    return;
-                }
-                
-                const allowanceData = '0xdd62ed3e' + 
-                    userAccount.substring(2).toLowerCase().padStart(64, '0') + 
-                    PANCAKE_ROUTER.substring(2).toLowerCase().padStart(64, '0');
-                
-                let allowance;
-                if (currentMode === 'metamask') {
-                    allowance = await window.ethereum.request({
-                        method: 'eth_call',
-                        params: [{ to: USDT_ADDRESS, data: allowanceData }, 'latest']
-                    });
-                    allowance = BigInt(allowance);
-                } else {
-                    const contract = new ethers.Contract(
-                        USDT_ADDRESS,
-                        ['function allowance(address,address) view returns (uint256)'],
-                        provider
-                    );
-                    const all = await contract.allowance(userAccount, PANCAKE_ROUTER);
-                    allowance = BigInt(all.toString());
-                }
-                
-                if (allowance < amountWei) {
-                    console.log('Approbation USDT...');
-                    
-                    if (currentMode === 'metamask') {
-                        const maxApproval = 'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
-                        const approveData = '0x095ea7b3' + 
-                            PANCAKE_ROUTER.substring(2).toLowerCase().padStart(64, '0') + 
-                            maxApproval;
-                        
-                        await window.ethereum.request({
-                            method: 'eth_sendTransaction',
-                            params: [{
-                                from: userAccount,
-                                to: USDT_ADDRESS,
-                                data: approveData,
-                                gas: '0x186A0'
-                            }]
-                        });
-                        
-                        alert('✅ Approbation! Attendez 10s...');
-                        await new Promise(r => setTimeout(r, 10000));
-                    } else {
-                        const contract = new ethers.Contract(
-                            USDT_ADDRESS,
-                            ['function approve(address,uint256) returns (bool)'],
-                            privateKeyWallet
-                        );
-                        const tx = await contract.approve(PANCAKE_ROUTER, ethers.constants.MaxUint256);
-                        await tx.wait();
-                        console.log('✅ Approbation auto');
-                    }
-                }
-                
-                const path = [USDT_ADDRESS, crypto.address];
-                const quoteData = '0xd06ca61f' +
-                    amountWei.toString(16).padStart(64, '0') +
-                    '0000000000000000000000000000000000000000000000000000000000000040' +
-                    '0000000000000000000000000000000000000000000000000000000000000002' +
-                    USDT_ADDRESS.substring(2).toLowerCase().padStart(64, '0') +
-                    crypto.address.substring(2).toLowerCase().padStart(64, '0');
-                
-                let quoteResult;
-                if (currentMode === 'metamask') {
-                    quoteResult = await window.ethereum.request({
-                        method: 'eth_call',
-                        params: [{ to: PANCAKE_ROUTER, data: quoteData }, 'latest']
-                    });
-                } else {
-                    quoteResult = await provider.call({
-                        to: PANCAKE_ROUTER,
-                        data: quoteData
-                    });
-                }
-                
-                const resultHex = quoteResult.substring(2);
-                const amountOut = BigInt('0x' + resultHex.substring(192, 256));
-                const amountOutMin = BigInt(Math.floor(Number(amountOut) * (1 - Math.max(slippage, 3)/100)));
-                
-                if (currentMode === 'metamask') {
-                    if (!confirm(`Confirmer?\n\n${amount} USDT → ~${(Number(amountOut)/1e18).toFixed(6)} ${crypto.symbol}`)) {
-                        return;
-                    }
-                }
-                
-                const deadline = Math.floor(Date.now()/1000) + 1200;
-                const userAddr = userAccount.substring(2).toLowerCase().padStart(64, '0');
-                
-                let swapData;
-                if (crypto.address.toLowerCase() === WBNB_ADDRESS.toLowerCase()) {
-                    swapData = '0x18cbafe5' + 
-                        amountWei.toString(16).padStart(64, '0') +
-                        amountOutMin.toString(16).padStart(64, '0') +
-                        '00000000000000000000000000000000000000000000000000000000000000a0' +
-                        userAddr +
-                        deadline.toString(16).padStart(64, '0') +
-                        '0000000000000000000000000000000000000000000000000000000000000002' +
-                        USDT_ADDRESS.substring(2).toLowerCase().padStart(64, '0') +
-                        WBNB_ADDRESS.substring(2).toLowerCase().padStart(64, '0');
-                } else {
-                    swapData = '0x38ed1739' +
-                        amountWei.toString(16).padStart(64, '0') +
-                        amountOutMin.toString(16).padStart(64, '0') +
-                        '00000000000000000000000000000000000000000000000000000000000000a0' +
-                        userAddr +
-                        deadline.toString(16).padStart(64, '0') +
-                        '0000000000000000000000000000000000000000000000000000000000000002' +
-                        USDT_ADDRESS.substring(2).toLowerCase().padStart(64, '0') +
-                        crypto.address.substring(2).toLowerCase().padStart(64, '0');
-                }
-                
-                let swapTx;
-                if (currentMode === 'metamask') {
-                    swapTx = await window.ethereum.request({
-                        method: 'eth_sendTransaction',
-                        params: [{
-                            from: userAccount,
-                            to: PANCAKE_ROUTER,
-                            data: swapData,
-                            gas: '0x7A120'
-                        }]
-                    });
-                } else {
-                    const tx = await privateKeyWallet.sendTransaction({
-                        to: PANCAKE_ROUTER,
-                        data: swapData,
-                        gasLimit: 500000
-                    });
-                    await tx.wait();
-                    swapTx = tx.hash;
-                }
-                
-                console.log('✅ Swap:', swapTx);
-                
-                dcaConfig.stats.totalBuys++;
-                dcaConfig.stats.totalInvested += amount;
-                dcaConfig.stats.totalTokens += Number(amountOut) / 1e18;
-                
-                updateDCAStatus();
-                await updateBalances();
-                
-                addToHistory({
-                    type: 'success',
-                    crypto: crypto.symbol,
-                    amount: amount,
-                    txHash: swapTx,
-                    date: new Date()
-                });
-                
-                if (currentMode === 'metamask') {
-                    alert(`✅ Achat réussi!\n${swapTx}`);
-                }
-                console.log('✅ Achat terminé');
-                
-            } catch (error) {
-                console.error('❌ Erreur:', error);
-                const msg = error.message || 'Erreur inconnue';
-                
-                addToHistory({
-                    type: 'failed',
-                    crypto: crypto?.symbol || '?',
-                    amount: amount,
-                    error: msg,
-                    date: new Date()
-                });
-                
-                if (currentMode === 'metamask') {
-                    alert('❌ ' + msg);
-                }
-            }
-        }
-
-        async function executeSale(amount, slippage, crypto) {
-            try {
-                console.log('🚀 Vente:', amount, crypto.symbol, '→ USDT');
-                
-                let bnbBalance;
-                if (currentMode === 'metamask') {
-                    const bal = await window.ethereum.request({
-                        method: 'eth_getBalance',
-                        params: [userAccount, 'latest']
-                    });
-                    bnbBalance = parseInt(bal, 16) / 1e18;
-                } else {
-                    const bal = await provider.getBalance(userAccount);
-                    bnbBalance = parseFloat(ethers.utils.formatEther(bal));
-                }
-                
-                if (bnbBalance < 0.005) {
-                    alert('❌ Pas assez de BNB (besoin ~0.005)');
-                    return;
-                }
-                
-                const amountWei = BigInt(Math.floor(amount * 1e18));
-                const isWBNB = crypto.address.toLowerCase() === WBNB_ADDRESS.toLowerCase();
-                
-                let cryptoBalance;
-                if (isWBNB) {
-                    cryptoBalance = BigInt(Math.floor(bnbBalance * 1e18));
-                } else {
-                    if (currentMode === 'metamask') {
-                        const data = '0x70a08231' + userAccount.substring(2).padStart(64, '0');
-                        const bal = await window.ethereum.request({
-                            method: 'eth_call',
-                            params: [{ to: crypto.address, data: data }, 'latest']
-                        });
-                        cryptoBalance = BigInt(bal);
-                    } else {
-                        const contract = new ethers.Contract(
-                            crypto.address,
-                            ['function balanceOf(address) view returns (uint256)'],
-                            provider
-                        );
-                        const bal = await contract.balanceOf(userAccount);
-                        cryptoBalance = BigInt(bal.toString());
-                    }
-                }
-                
-                if (cryptoBalance < amountWei) {
-                    alert(`❌ Pas assez de ${crypto.symbol}`);
-                    return;
-                }
-                
-                if (!isWBNB) {
-                    const allowanceData = '0xdd62ed3e' + 
-                        userAccount.substring(2).toLowerCase().padStart(64, '0') + 
-                        PANCAKE_ROUTER.substring(2).toLowerCase().padStart(64, '0');
-                    
-                    let allowance;
-                    if (currentMode === 'metamask') {
-                        allowance = await window.ethereum.request({
-                            method: 'eth_call',
-                            params: [{ to: crypto.address, data: allowanceData }, 'latest']
-                        });
-                        allowance = BigInt(allowance);
-                    } else {
-                        const contract = new ethers.Contract(
-                            crypto.address,
-                            ['function allowance(address,address) view returns (uint256)'],
-                            provider
-                        );
-                        const all = await contract.allowance(userAccount, PANCAKE_ROUTER);
-                        allowance = BigInt(all.toString());
-                    }
-                    
-                    if (allowance < amountWei) {
-                        console.log('Approbation', crypto.symbol);
-                        
-                        if (currentMode === 'metamask') {
-                            const maxApproval = 'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
-                            const approveData = '0x095ea7b3' + 
-                                PANCAKE_ROUTER.substring(2).toLowerCase().padStart(64, '0') + 
-                                maxApproval;
-                            
-                            await window.ethereum.request({
-                                method: 'eth_sendTransaction',
-                                params: [{
-                                    from: userAccount,
-                                    to: crypto.address,
-                                    data: approveData,
-                                    gas: '0x186A0'
-                                }]
-                            });
-                            
-                            alert('✅ Approbation! Attendez 10s...');
-                            await new Promise(r => setTimeout(r, 10000));
-                        } else {
-                            const contract = new ethers.Contract(
-                                crypto.address,
-                                ['function approve(address,uint256) returns (bool)'],
-                                privateKeyWallet
-                            );
-                            const tx = await contract.approve(PANCAKE_ROUTER, ethers.constants.MaxUint256);
-                            await tx.wait();
-                            console.log('✅ Approbation auto');
-                        }
-                    }
-                }
-                
-                const path = [crypto.address, USDT_ADDRESS];
-                const quoteData = '0xd06ca61f' +
-                    amountWei.toString(16).padStart(64, '0') +
-                    '0000000000000000000000000000000000000000000000000000000000000040' +
-                    '0000000000000000000000000000000000000000000000000000000000000002' +
-                    crypto.address.substring(2).toLowerCase().padStart(64, '0') +
-                    USDT_ADDRESS.substring(2).toLowerCase().padStart(64, '0');
-                
-                let quoteResult;
-                if (currentMode === 'metamask') {
-                    quoteResult = await window.ethereum.request({
-                        method: 'eth_call',
-                        params: [{ to: PANCAKE_ROUTER, data: quoteData }, 'latest']
-                    });
-                } else {
-                    quoteResult = await provider.call({
-                        to: PANCAKE_ROUTER,
-                        data: quoteData
-                    });
-                }
-                
-                const resultHex = quoteResult.substring(2);
-                const amountOut = BigInt('0x' + resultHex.substring(192, 256));
-                const amountOutMin = BigInt(Math.floor(Number(amountOut) * (1 - Math.max(slippage, 3)/100)));
-                
-                if (currentMode === 'metamask') {
-                    if (!confirm(`Confirmer?\n\n${amount} ${crypto.symbol} → ~${(Number(amountOut)/1e18).toFixed(2)} USDT`)) {
-                        return;
-                    }
-                }
-                
-                const deadline = Math.floor(Date.now()/1000) + 1200;
-                const userAddr = userAccount.substring(2).toLowerCase().padStart(64, '0');
-                
-                let swapData, swapValue = '0x0';
-                
-                if (isWBNB) {
-                    const bnbPath = [WBNB_ADDRESS, USDT_ADDRESS];
-                    const pathEncoded = bnbPath.map(a => a.substring(2).toLowerCase().padStart(64, '0')).join('');
-                    
-                    swapData = '0xb6f9de95' +
-                        amountOutMin.toString(16).padStart(64, '0') +
-                        '0000000000000000000000000000000000000000000000000000000000000080' +
-                        userAddr +
-                        deadline.toString(16).padStart(64, '0') +
-                        '0000000000000000000000000000000000000000000000000000000000000002' +
-                        pathEncoded;
-                    swapValue = '0x' + amountWei.toString(16);
-                } else {
-                    swapData = '0x5c11d795' +
-                        amountWei.toString(16).padStart(64, '0') +
-                        amountOutMin.toString(16).padStart(64, '0') +
-                        '00000000000000000000000000000000000000000000000000000000000000a0' +
-                        userAddr +
-                        deadline.toString(16).padStart(64, '0') +
-                        '0000000000000000000000000000000000000000000000000000000000000002' +
-                        crypto.address.substring(2).toLowerCase().padStart(64, '0') +
-                        USDT_ADDRESS.substring(2).toLowerCase().padStart(64, '0');
-                }
-                
-                let swapTx;
-                if (currentMode === 'metamask') {
-                    swapTx = await window.ethereum.request({
-                        method: 'eth_sendTransaction',
-                        params: [{
-                            from: userAccount,
-                            to: PANCAKE_ROUTER,
-                            data: swapData,
-                            gas: isWBNB ? '0xC3500' : '0x91630',
-                            value: swapValue
-                        }]
-                    });
-                } else {
-                    const tx = await privateKeyWallet.sendTransaction({
-                        to: PANCAKE_ROUTER,
-                        data: swapData,
-                        gasLimit: isWBNB ? 800000 : 600000,
-                        value: swapValue
-                    });
-                    await tx.wait();
-                    swapTx = tx.hash;
-                }
-                
-                console.log('✅ Swap:', swapTx);
-                
-                dcaConfig.stats.totalBuys++;
-                dcaConfig.stats.totalInvested += Number(amountOut) / 1e18;
-                dcaConfig.stats.totalTokens += amount;
-                
-                updateDCAStatus();
-                await updateBalances();
-                
-                addToHistory({
-                    type: 'success',
-                    crypto: `${crypto.symbol} → USDT`,
-                    amount: amount,
-                    txHash: swapTx,
-                    date: new Date()
-                });
-                
-                if (currentMode === 'metamask') {
-                    alert(`✅ Vente réussie!\n${swapTx}`);
-                }
-                console.log('✅ Vente terminée');
-                
-            } catch (error) {
-                console.error('❌ Erreur:', error);
-                const msg = error.message || 'Erreur inconnue';
-                
-                addToHistory({
-                    type: 'failed',
-                    crypto: `${crypto?.symbol || '?'} → USDT`,
-                    amount: amount,
-                    error: msg,
-                    date: new Date()
-                });
-                
-                if (currentMode === 'metamask') {
-                    alert('❌ ' + msg);
-                }
-            }
-        }
-
-        function startDCA() {
-            if (!selectedCrypto) {
-                alert('Sélectionnez une crypto');
-                return;
-            }
-            
-            const amount = parseFloat(document.getElementById('amountInput').value);
-            const interval = parseInt(document.getElementById('intervalSelect').value);
-            const slippage = parseFloat(document.getElementById('slippageInput').value);
-            
-            if (!amount || amount <= 0) {
-                alert('Montant invalide');
-                return;
-            }
-            
-            dcaConfig = {
-                active: true,
-                type: dcaType,
-                crypto: selectedCrypto,
-                amount: amount,
-                interval: interval,
-                slippage: slippage,
-                nextRun: Date.now() + interval * 1000,
-                stats: dcaConfig.stats
-            };
-            
-            updateDCAStatus();
-            
-            document.getElementById('startDcaBtn').style.display = 'none';
-            document.getElementById('stopDcaBtn').style.display = 'block';
-            
-            dcaInterval = setInterval(checkAndExecuteDCA, 5000);
-            
-            alert(`🚀 DCA démarré!\n${currentMode === 'privatekey' ? 'Mode automatique - Sans confirmation' : 'Mode MetaMask - Avec confirmation'}`);
-        }
-
-        function stopDCA() {
-            dcaConfig.active = false;
-            clearInterval(dcaInterval);
-            
-            document.getElementById('startDcaBtn').style.display = 'block';
-            document.getElementById('stopDcaBtn').style.display = 'none';
-            document.getElementById('dcaStatus').textContent = 'Inactif';
-            
-            alert('⏸️ DCA arrêté');
-        }
-
-        function checkAndExecuteDCA() {
-            if (!dcaConfig.active) return;
-            
-            const now = Date.now();
-            const timeUntilNext = dcaConfig.nextRun - now;
-            
-            if (timeUntilNext <= 0) {
-                if (dcaConfig.type === 'sell') {
-                    executeSale(dcaConfig.amount, dcaConfig.slippage, dcaConfig.crypto);
-                } else {
-                    executePurchase(dcaConfig.amount, dcaConfig.slippage, dcaConfig.crypto);
-                }
-                dcaConfig.nextRun = now + dcaConfig.interval * 1000;
-            }
-            
-            const seconds = Math.floor(timeUntilNext / 1000);
-            const minutes = Math.floor(seconds / 60);
-            const hours = Math.floor(minutes / 60);
-            
-            let timeText;
-            if (hours > 0) {
-                timeText = `${hours}h ${minutes % 60}m`;
-            } else if (minutes > 0) {
-                timeText = `${minutes}m ${seconds % 60}s`;
-            } else {
-                timeText = `${seconds}s`;
-            }
-            
-            document.getElementById('nextExecution').textContent = timeText;
-        }
-
-        function updateDCAStatus() {
-            const type = dcaConfig.type === 'sell' ? 'Vente' : 'Achat';
-            document.getElementById('currentAmount').textContent = dcaConfig.amount ? 
-                `${dcaConfig.amount} ${dcaConfig.type === 'sell' ? dcaConfig.crypto?.symbol : 'USDT'} (${type})` : '-';
-            
-            const intervalText = {
-                '3600': 'Toutes les heures',
-                '21600': '6 heures',
-                '43200': '12 heures',
-                '86400': '1 jour',
-                '604800': '1 semaine'
-            };
-            
-            document.getElementById('currentInterval').textContent = intervalText[dcaConfig.interval] || '-';
-            document.getElementById('dcaStatus').textContent = dcaConfig.active ? '🟢 Actif' : '🔴 Inactif';
-            document.getElementById('totalBuys').textContent = dcaConfig.stats.totalBuys;
-            document.getElementById('totalInvested').textContent = `${dcaConfig.stats.totalInvested.toFixed(2)} USDT`;
-            document.getElementById('totalTokens').textContent = `${dcaConfig.stats.totalTokens.toFixed(6)}`;
-        }
-
-        async function updateSwapBalance() {
-            const fromToken = document.getElementById('swapFromToken').value;
-            if (!fromToken || !userAccount) return;
-            
-            try {
-                const isFromBNB = fromToken.toLowerCase() === WBNB_ADDRESS.toLowerCase();
-                let balance;
-                
-                if (isFromBNB) {
-                    if (currentMode === 'metamask') {
-                        const bal = await window.ethereum.request({
-                            method: 'eth_getBalance',
-                            params: [userAccount, 'latest']
-                        });
-                        balance = (parseInt(bal, 16) / 1e18).toFixed(4);
-                    } else {
-                        const bal = await provider.getBalance(userAccount);
-                        balance = parseFloat(ethers.utils.formatEther(bal)).toFixed(4);
-                    }
-                } else {
-                    if (currentMode === 'metamask') {
-                        const data = '0x70a08231' + userAccount.substring(2).padStart(64, '0');
-                        const bal = await window.ethereum.request({
-                            method: 'eth_call',
-                            params: [{ to: fromToken, data: data }, 'latest']
-                        });
-                        balance = (parseInt(bal, 16) / 1e18).toFixed(4);
-                    } else {
-                        const contract = new ethers.Contract(
-                            fromToken,
-                            ['function balanceOf(address) view returns (uint256)'],
-                            provider
-                        );
-                        const bal = await contract.balanceOf(userAccount);
-                        balance = parseFloat(ethers.utils.formatEther(bal)).toFixed(4);
-                    }
-                }
-                
-                document.getElementById('swapFromBalance').textContent = balance;
-            } catch (error) {
-                console.error('Erreur balance:', error);
-                document.getElementById('swapFromBalance').textContent = '0';
-            }
-        }
-
-        function switchSwapTokens() {
-            const from = document.getElementById('swapFromToken');
-            const to = document.getElementById('swapToToken');
-            const temp = from.value;
-            from.value = to.value;
-            to.value = temp;
-        }
-
-        async function getSwapEstimate() {
-            const fromToken = document.getElementById('swapFromToken').value;
-            const toToken = document.getElementById('swapToToken').value;
-            const amount = parseFloat(document.getElementById('swapAmount').value);
-
-            if (!fromToken || !toToken) {
-                alert('Sélectionnez les deux tokens');
-                return;
-            }
-
-            if (fromToken === toToken) {
-                alert('Tokens différents requis');
-                return;
-            }
-
-            if (!amount || amount <= 0) {
-                alert('Montant invalide');
-                return;
-            }
-
-            try {
-                const amountWei = BigInt(Math.floor(amount * 1e18));
-                
-                const isFromBNB = fromToken.toLowerCase() === WBNB_ADDRESS.toLowerCase();
-                const isToBNB = toToken.toLowerCase() === WBNB_ADDRESS.toLowerCase();
-                
-                let path;
-                if (isFromBNB || isToBNB) {
-                    path = [fromToken, toToken];
-                } else {
-                    path = [fromToken, WBNB_ADDRESS, toToken];
-                }
-
-                let pathEncoded = path.map(addr => addr.substring(2).toLowerCase().padStart(64, '0')).join('');
-                
-                const quoteData = '0xd06ca61f' +
-                    amountWei.toString(16).padStart(64, '0') +
-                    '0000000000000000000000000000000000000000000000000000000000000040' +
-                    path.length.toString(16).padStart(64, '0') +
-                    pathEncoded;
-
-                let quoteResult;
-                if (currentMode === 'metamask') {
-                    quoteResult = await window.ethereum.request({
-                        method: 'eth_call',
-                        params: [{ to: PANCAKE_ROUTER, data: quoteData }, 'latest']
-                    });
-                } else {
-                    quoteResult = await provider.call({
-                        to: PANCAKE_ROUTER,
-                        data: quoteData
-                    });
-                }
-
-                const resultHex = quoteResult.substring(2);
-                const offset = parseInt(resultHex.substring(0, 64), 16) * 2;
-                const arrayLength = parseInt(resultHex.substring(offset, offset + 64), 16);
-                const lastIndex = offset + 64 + (arrayLength - 1) * 64;
-                const amountOut = BigInt('0x' + resultHex.substring(lastIndex, lastIndex + 64));
-
-                swapEstimateAmount = amountOut;
-                const estimateDisplay = (Number(amountOut) / 1e18).toFixed(6);
-                const fromName = getTokenName(fromToken);
-                const toName = getTokenName(toToken);
-                
-                document.getElementById('swapEstimate').value = estimateDisplay + ' ' + toName;
-
-                const rate = (Number(amountOut) / 1e18) / amount;
-                alert(`💰 Prix:\n\n${amount} ${fromName} = ${estimateDisplay} ${toName}\n\nTaux: 1 ${fromName} = ${rate.toFixed(6)} ${toName}`);
-
-            } catch (error) {
-                console.error('Erreur:', error);
-                alert('❌ Erreur de prix');
-            }
-        }
-
-        function getTokenName(address) {
-            const token = TOP_50_SWAP_TOKENS.find(t => t.address.toLowerCase() === address.toLowerCase());
-            return token ? token.symbol : 'Unknown';
-        }
-
-        async function executeSwap() {
-            const fromToken = document.getElementById('swapFromToken').value;
-            const toToken = document.getElementById('swapToToken').value;
-            const amount = parseFloat(document.getElementById('swapAmount').value);
-            const slippage = parseFloat(document.getElementById('swapSlippage').value);
-
-            if (!fromToken || !toToken) {
-                alert('Sélectionnez les tokens');
-                return;
-            }
-
-            if (fromToken === toToken) {
-                alert('Tokens différents requis');
-                return;
-            }
-
-            if (!amount || amount <= 0) {
-                alert('Montant invalide');
-                return;
-            }
-
-            if (swapEstimateAmount === 0) {
-                alert('Obtenez le prix d\'abord');
-                return;
-            }
-
-            try {
-                const amountWei = BigInt(Math.floor(amount * 1e18));
-                const isFromBNB = fromToken.toLowerCase() === WBNB_ADDRESS.toLowerCase();
-                const isToBNB = toToken.toLowerCase() === WBNB_ADDRESS.toLowerCase();
-
-                let balance;
-                if (isFromBNB) {
-                    if (currentMode === 'metamask') {
-                        const bal = await window.ethereum.request({
-                            method: 'eth_getBalance',
-                            params: [userAccount, 'latest']
-                        });
-                        balance = BigInt(bal);
-                    } else {
-                        const bal = await provider.getBalance(userAccount);
-                        balance = BigInt(bal.toString());
-                    }
-                    
-                    const minKeep = BigInt(Math.floor(0.005 * 1e18));
-                    if (balance < amountWei + minKeep) {
-                        alert('❌ Balance BNB insuffisante!');
-                        return;
-                    }
-                } else {
-                    if (currentMode === 'metamask') {
-                        const data = '0x70a08231' + userAccount.substring(2).padStart(64, '0');
-                        const bal = await window.ethereum.request({
-                            method: 'eth_call',
-                            params: [{ to: fromToken, data: data }, 'latest']
-                        });
-                        balance = BigInt(bal);
-                    } else {
-                        const contract = new ethers.Contract(
-                            fromToken,
-                            ['function balanceOf(address) view returns (uint256)'],
-                            provider
-                        );
-                        const bal = await contract.balanceOf(userAccount);
-                        balance = BigInt(bal.toString());
-                    }
-                    
-                    if (balance < amountWei) {
-                        alert('❌ Balance insuffisante!');
-                        return;
-                    }
-                }
-
-                if (!isFromBNB) {
-                    const allowanceData = '0xdd62ed3e' + 
-                        userAccount.substring(2).toLowerCase().padStart(64, '0') + 
-                        PANCAKE_ROUTER.substring(2).toLowerCase().padStart(64, '0');
-                    
-                    let allowance;
-                    if (currentMode === 'metamask') {
-                        allowance = await window.ethereum.request({
-                            method: 'eth_call',
-                            params: [{ to: fromToken, data: allowanceData }, 'latest']
-                        });
-                        allowance = BigInt(allowance);
-                    } else {
-                        const contract = new ethers.Contract(
-                            fromToken,
-                            ['function allowance(address,address) view returns (uint256)'],
-                            provider
-                        );
-                        const all = await contract.allowance(userAccount, PANCAKE_ROUTER);
-                        allowance = BigInt(all.toString());
-                    }
-                    
-                    if (allowance < amountWei) {
-                        if (currentMode === 'metamask') {
-                            if (!confirm('Autoriser PancakeSwap?')) {
-                                return;
-                            }
-                            
-                            const maxApproval = 'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
-                            const approveData = '0x095ea7b3' + 
-                                PANCAKE_ROUTER.substring(2).toLowerCase().padStart(64, '0') + 
-                                maxApproval;
-                            
-                            await window.ethereum.request({
-                                method: 'eth_sendTransaction',
-                                params: [{
-                                    from: userAccount,
-                                    to: fromToken,
-                                    data: approveData,
-                                    gas: '0x186A0'
-                                }]
-                            });
-                            
-                            alert('✅ Approbation! Attendez 10s...');
-                            await new Promise(r => setTimeout(r, 10000));
-                        } else {
-                            const contract = new ethers.Contract(
-                                fromToken,
-                                ['function approve(address,uint256) returns (bool)'],
-                                privateKeyWallet
-                            );
-                            const tx = await contract.approve(PANCAKE_ROUTER, ethers.constants.MaxUint256);
-                            await tx.wait();
-                            console.log('✅ Approbation auto');
-                        }
-                    }
-                }
-
-                const safeSlippage = Math.max(slippage, 2);
-                const amountOutMin = BigInt(Math.floor(Number(swapEstimateAmount) * (1 - safeSlippage/100)));
-
-                const fromName = getTokenName(fromToken);
-                const toName = getTokenName(toToken);
-
-                if (currentMode === 'metamask') {
-                    if (!confirm(`Confirmer?\n\n${amount} ${fromName} → ~${(Number(swapEstimateAmount)/1e18).toFixed(6)} ${toName}`)) {
-                        return;
-                    }
-                }
-
-                let path;
-                if (isFromBNB || isToBNB) {
-                    path = [fromToken, toToken];
-                } else {
-                    path = [fromToken, WBNB_ADDRESS, toToken];
-                }
-
-                const deadline = Math.floor(Date.now()/1000) + 1200;
-                const userAddr = userAccount.substring(2).toLowerCase().padStart(64, '0');
-                
-                let swapData, swapValue = '0x0';
-                
-                if (isFromBNB) {
-                    const bnbPath = [WBNB_ADDRESS, toToken];
-                    const pathEncoded = bnbPath.map(a => a.substring(2).toLowerCase().padStart(64, '0')).join('');
-                    
-                    swapData = '0xb6f9de95' +
-                        amountOutMin.toString(16).padStart(64, '0') +
-                        '0000000000000000000000000000000000000000000000000000000000000080' +
-                        userAddr +
-                        deadline.toString(16).padStart(64, '0') +
-                        '0000000000000000000000000000000000000000000000000000000000000002' +
-                        pathEncoded;
-                    swapValue = '0x' + amountWei.toString(16);
-                } else if (isToBNB) {
-                    const bnbPath = [fromToken, WBNB_ADDRESS];
-                    const pathEncoded = bnbPath.map(a => a.substring(2).toLowerCase().padStart(64, '0')).join('');
-                    
-                    swapData = '0x791ac947' +
-                        amountWei.toString(16).padStart(64, '0') +
-                        amountOutMin.toString(16).padStart(64, '0') +
-                        '00000000000000000000000000000000000000000000000000000000000000a0' +
-                        userAddr +
-                        deadline.toString(16).padStart(64, '0') +
-                        '0000000000000000000000000000000000000000000000000000000000000002' +
-                        pathEncoded;
-                } else {
-                    const pathEncoded = path.map(a => a.substring(2).toLowerCase().padStart(64, '0')).join('');
-                    swapData = '0x5c11d795' +
-                        amountWei.toString(16).padStart(64, '0') +
-                        amountOutMin.toString(16).padStart(64, '0') +
-                        '00000000000000000000000000000000000000000000000000000000000000a0' +
-                        userAddr +
-                        deadline.toString(16).padStart(64, '0') +
-                        path.length.toString(16).padStart(64, '0') +
-                        pathEncoded;
-                }
-
-                let gasEstimate;
-                if (isFromBNB) {
-                    gasEstimate = currentMode === 'metamask' ? '0xC3500' : 800000;
-                } else if (isToBNB) {
-                    gasEstimate = currentMode === 'metamask' ? '0xAA690' : 700000;
-                } else {
-                    gasEstimate = currentMode === 'metamask' ? '0x91630' : 600000;
-                }
-
-                let swapTx;
-                if (currentMode === 'metamask') {
-                    swapTx = await window.ethereum.request({
-                        method: 'eth_sendTransaction',
-                        params: [{
-                            from: userAccount,
-                            to: PANCAKE_ROUTER,
-                            data: swapData,
-                            gas: gasEstimate,
-                            value: swapValue
-                        }]
-                    });
-                } else {
-                    const tx = await privateKeyWallet.sendTransaction({
-                        to: PANCAKE_ROUTER,
-                        data: swapData,
-                        gasLimit: gasEstimate,
-                        value: swapValue
-                    });
-                    await tx.wait();
-                    swapTx = tx.hash;
-                }
-
-                console.log('✅ Swap:', swapTx);
-                
-                await updateBalances();
-                
-                addToHistory({
-                    type: 'success',
-                    crypto: `${fromName} → ${toName}`,
-                    amount: amount,
-                    txHash: swapTx,
-                    date: new Date()
-                });
-
-                if (currentMode === 'metamask') {
-                    alert(`✅ Swap réussi!\n${swapTx}`);
-                }
-                
-                document.getElementById('swapEstimate').value = '';
-                swapEstimateAmount = 0;
-
-            } catch (error) {
-                console.error('Erreur swap:', error);
-                
-                const msg = error.message || 'Erreur inconnue';
-                const fromName = getTokenName(fromToken);
-                const toName = getTokenName(toToken);
-                
-                addToHistory({
-                    type: 'failed',
-                    crypto: `${fromName} → ${toName}`,
-                    amount: amount,
-                    error: msg,
-                    date: new Date()
-                });
-                
-                if (currentMode === 'metamask') {
-                    alert('❌ ' + msg);
-                }
-            }
-        }
-
-        function addToHistory(entry) {
-            history.unshift(entry);
-            
-            const container = document.getElementById('historyContainer');
-            const historyClass = entry.type === 'success' ? 'success' : 'failed';
-            
-            const historyItem = document.createElement('div');
-            historyItem.className = `history-item ${historyClass}`;
-            historyItem.innerHTML = `
-                <div style="font-size: 0.85em; color: #666; margin-bottom: 5px;">
-                    ${entry.date.toLocaleString('fr-FR')}
-                </div>
-                <div style="font-size: 0.95em; color: #333;">
-                    <strong>${entry.type === 'success' ? '✅' : '❌'} ${entry.crypto}</strong> - ${entry.amount.toFixed(4)}
-                    ${entry.type === 'success' ? 
-                        `<br><a href="https://bscscan.com/tx/${entry.txHash}" target="_blank" style="color: #667eea;">${entry.txHash.substring(0, 10)}...</a>` : 
-                        `<br>${entry.error}`
-                    }
-                </div>
-            `;
-            
-            if (history.length === 1) {
-                container.innerHTML = '';
-            }
-            
-            container.insertBefore(historyItem, container.firstChild);
-            
-            if (history.length > 20) {
-                history.pop();
-                container.removeChild(container.lastChild);
-            }
-        }
-
-        window.addEventListener('load', () => {
-            if (typeof window.ethereum === 'undefined') {
-                document.getElementById('connectBtn').disabled = true;
-                document.getElementById('connectBtn').textContent = 'MetaMask non installé';
-            }
-        });
-    </script>
-</body>
-</html><!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
@@ -1694,7 +387,7 @@
         <div class="header">
             <h1>🤖 DCA Trading Bot - Dual Mode</h1>
             <p>Mode MetaMask (Sécurisé) ou Mode Clé Privée (Automatique)</p>
-            <small style="opacity: 0.8;">Top 20 DCA • Top 50 Swap</small>
+            <small style="opacity: 0.8;">Top 20 DCA • Top 50 Swap • Sans Commission</small>
         </div>
 
         <div class="wallet-section">
@@ -1764,8 +457,8 @@
         </div>
 
         <div id="connectedContent" style="display: none;">
-            <div class="alert alert-warning">
-                ⚠️ <strong>Important:</strong> Assurez-vous d'avoir du BNB pour les frais de gas (~0.005 BNB)
+            <div class="alert alert-info">
+                ℹ️ <strong>Frais de gas uniquement:</strong> Assurez-vous d'avoir du BNB pour les frais (~0.003-0.005 BNB par transaction)
             </div>
 
             <div class="grid">
@@ -1804,7 +497,6 @@
                     <div class="form-group">
                         <label>Balance USDT: <span id="usdtBalance">0</span></label>
                         <label>Balance BNB: <span id="bnbBalance">0</span></label>
-                        <label id="cryptoBalanceLabel" style="display: none;">Balance <span id="cryptoBalanceSymbol"></span>: <span id="cryptoBalance">0</span></label>
                     </div>
 
                     <div class="form-group">
@@ -1883,7 +575,7 @@
                     </div>
 
                     <button class="btn btn-success" onclick="getSwapEstimate()" style="width: 100%;">
-                        💰 Prix
+                        💰 Obtenir le Prix
                     </button>
 
                     <button class="btn btn-primary" onclick="executeSwap()" style="width: 100%; margin-top: 10px;">
@@ -2001,4 +693,1309 @@
             { symbol: 'BIFI', name: 'Beefy', address: '0xCa3F508B8e4Dd382eE878A314789373D80A5190A', rank: 28 },
             { symbol: 'BTT', name: 'BitTorrent', address: '0x352Cb5E19b12FC216548a2677bD0fce83BaE434B', rank: 29 },
             { symbol: 'BURGER', name: 'Burger', address: '0xAe9269f27437f0fcBC232d39Ec814844a51d6b8f', rank: 30 },
-            { symbol: 'NEAR', name: 'NEAR', address: '0x1Fa4a73a3F0133f
+            { symbol: 'NEAR', name: 'NEAR', address: '0x1Fa4a73a3F0133f0025378af00236f3aBDEE5D63', rank: 31 },
+            { symbol: 'ALGO', name: 'Algorand', address: '0xa1faa15655B0e7b6B6470ED3d096390e6aD93Abb', rank: 32 },
+            { symbol: 'AAVE', name: 'Aave', address: '0xfb6115445Bff7b52FeB98650C87f44907E58f802', rank: 33 },
+            { symbol: 'SXP', name: 'Swipe', address: '0x47BEAd2563dCBf3bF2c9407fEa4dC236fAbA485A', rank: 34 },
+            { symbol: 'SUSHI', name: 'SushiSwap', address: '0x947950BcC74888a40Ffa2593C5798F11Fc9124C4', rank: 35 },
+            { symbol: 'COMP', name: 'Compound', address: '0x52CE071Bd9b1C4B00A0b92D298c512478CaD67e8', rank: 36 },
+            { symbol: 'YFI', name: 'yearn', address: '0x88f1A5ae2A3BF98AEAF342D26B30a79438c9142e', rank: 37 },
+            { symbol: 'SNX', name: 'Synthetix', address: '0x9Ac983826058b8a9C7Aa1C9171441191232E8404', rank: 38 },
+            { symbol: 'MKR', name: 'Maker', address: '0x5f0Da599BB2ccCfcf6Fdfd7D81743B6020864350', rank: 39 },
+            { symbol: 'DAI', name: 'Dai', address: '0x1AF3F329e8BE154074D8769D1FFa4eE058B1DBc3', rank: 40 },
+            { symbol: 'CREAM', name: 'Cream', address: '0xd4CB328A82bDf5f03eB737f37Fa6B370aef3e888', rank: 41 },
+            { symbol: 'DODO', name: 'DODO', address: '0x67ee3Cb086F8a16f34beE3ca72FAD36F7Db929e2', rank: 42 },
+            { symbol: 'EGG', name: 'Goose', address: '0xF952Fc3ca7325Cc27D15885d37117676d25BfdA6', rank: 43 },
+            { symbol: 'EGLD', name: 'Elrond', address: '0xbF7c81FFF98BbE61B40Ed186e4AfD6DDd01337fe', rank: 44 },
+            { symbol: 'EOS', name: 'EOS', address: '0x56b6fB708fC5732DEC1Afc8D8556423A2EDcCbD6', rank: 45 },
+            { symbol: 'FTM', name: 'Fantom', address: '0xAD29AbB318791D579433D831ed122aFeAf29dcfe', rank: 46 },
+            { symbol: 'INJ', name: 'Injective', address: '0xa2B726B1145A4773F68593CF171187d8EBe4d495', rank: 47 },
+            { symbol: 'SHIB', name: 'Shiba', address: '0x2859e4544C4bB03966803b044A93563Bd2D0DD4D', rank: 48 },
+            { symbol: 'SAND', name: 'Sandbox', address: '0x67b725d7e342d7B611fa85e859Df9697D9378B2e', rank: 49 },
+            { symbol: 'MANA', name: 'Decentraland', address: '0x26433c8127d9b4e9B71Eaa15111DF99Ea2EeB2f8', rank: 50 }
+        ];
+
+        const history = [];
+
+        function selectMode(mode) {
+            currentMode = mode;
+            
+            if (mode === 'metamask') {
+                document.getElementById('metaMaskModeBtn').classList.add('active');
+                document.getElementById('privateKeyModeBtn').classList.remove('active');
+                document.getElementById('metaMaskSection').style.display = 'block';
+                document.getElementById('privateKeySection').style.display = 'none';
+            } else {
+                document.getElementById('metaMaskModeBtn').classList.remove('active');
+                document.getElementById('privateKeyModeBtn').classList.add('active');
+                document.getElementById('metaMaskSection').style.display = 'none';
+                document.getElementById('privateKeySection').style.display = 'block';
+            }
+            
+            document.getElementById('connectedContent').style.display = 'none';
+            if (dcaConfig.active) stopDCA();
+        }
+
+        async function connectWallet() {
+            if (typeof window.ethereum === 'undefined') {
+                alert('❌ MetaMask non installé');
+                window.open('https://metamask.io/download/', '_blank');
+                return;
+            }
+            
+            try {
+                const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                userAccount = accounts[0];
+                
+                const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+                
+                if (chainId !== '0x38') {
+                    alert('⚠️ Veuillez passer sur BSC');
+                    await switchToBSC();
+                    return;
+                }
+                
+                document.getElementById('walletStatus').className = 'status connected';
+                document.getElementById('walletStatus').textContent = 'Connecté';
+                document.getElementById('walletAddress').textContent = userAccount.substring(0, 6) + '...' + userAccount.substring(38);
+                document.getElementById('networkBadge').style.display = 'inline-block';
+                document.getElementById('networkBadge').className = 'network-badge network-bsc';
+                document.getElementById('networkBadge').textContent = 'BSC';
+                document.getElementById('connectBtn').textContent = 'Déconnecter';
+                document.getElementById('connectBtn').onclick = disconnectWallet;
+                document.getElementById('connectedContent').style.display = 'block';
+                
+                await updateBalances();
+                loadCryptoLists();
+                
+                window.ethereum.on('accountsChanged', handleAccountsChanged);
+                window.ethereum.on('chainChanged', () => window.location.reload());
+                
+            } catch (error) {
+                console.error('Erreur:', error);
+                alert('❌ Erreur de connexion: ' + error.message);
+            }
+        }
+
+        async function switchToBSC() {
+            try {
+                await window.ethereum.request({
+                    method: 'wallet_switchEthereumChain',
+                    params: [{ chainId: '0x38' }],
+                });
+            } catch (error) {
+                if (error.code === 4902) {
+                    await window.ethereum.request({
+                        method: 'wallet_addEthereumChain',
+                        params: [{
+                            chainId: '0x38',
+                            chainName: 'BNB Smart Chain',
+                            nativeCurrency: { name: 'BNB', symbol: 'BNB', decimals: 18 },
+                            rpcUrls: ['https://bsc-dataseed1.binance.org'],
+                            blockExplorerUrls: ['https://bscscan.com']
+                        }]
+                    });
+                }
+            }
+        }
+
+        function disconnectWallet() {
+            userAccount = null;
+            document.getElementById('walletStatus').className = 'status disconnected';
+            document.getElementById('walletStatus').textContent = 'Non connecté';
+            document.getElementById('connectedContent').style.display = 'none';
+            document.getElementById('connectBtn').textContent = 'Connecter MetaMask';
+            document.getElementById('connectBtn').onclick = connectWallet;
+            if (dcaConfig.active) stopDCA();
+        }
+
+        function handleAccountsChanged(accounts) {
+            if (accounts.length === 0) {
+                disconnectWallet();
+            } else {
+                userAccount = accounts[0];
+                updateBalances();
+            }
+        }
+
+        async function connectWithPrivateKey() {
+            const pkInput = document.getElementById('privateKeyInput').value.trim();
+            
+            if (!pkInput) {
+                alert('❌ Veuillez entrer votre clé privée');
+                return;
+            }
+            
+            try {
+                const privateKey = pkInput.startsWith('0x') ? pkInput : '0x' + pkInput;
+                
+                if (privateKey.length !== 66) {
+                    alert('❌ Clé privée invalide (doit faire 64 caractères hexadécimaux + 0x)');
+                    return;
+                }
+                
+                provider = new ethers.providers.JsonRpcProvider(BSC_RPC);
+                privateKeyWallet = new ethers.Wallet(privateKey, provider);
+                userAccount = privateKeyWallet.address;
+                
+                console.log('✅ Connecté:', userAccount);
+                
+                document.getElementById('pkAddress').textContent = userAccount.substring(0, 6) + '...' + userAccount.substring(38);
+                document.getElementById('pkWalletInfo').style.display = 'block';
+                document.getElementById('connectedContent').style.display = 'block';
+                
+                await updateBalances();
+                loadCryptoLists();
+                
+                alert('✅ Connecté avec clé privée\n\nMode AUTOMATIQUE activé - Les transactions DCA s\'exécuteront sans confirmation !');
+                
+            } catch (error) {
+                console.error('Erreur:', error);
+                alert('❌ Clé privée invalide: ' + error.message);
+            }
+        }
+
+        function clearPrivateKey() {
+            if (confirm('Êtes-vous sûr de vouloir effacer la clé privée de la mémoire ?')) {
+                privateKeyWallet = null;
+                provider = null;
+                userAccount = null;
+                document.getElementById('privateKeyInput').value = '';
+                document.getElementById('pkWalletInfo').style.display = 'none';
+                document.getElementById('connectedContent').style.display = 'none';
+                if (dcaConfig.active) stopDCA();
+                alert('✅ Clé privée effacée de la mémoire');
+            }
+        }
+
+        async function updateBalances() {
+            if (!userAccount) return;
+            
+            try {
+                if (currentMode === 'metamask') {
+                    const usdtData = '0x70a08231' + userAccount.substring(2).padStart(64, '0');
+                    const usdtBalance = await window.ethereum.request({
+                        method: 'eth_call',
+                        params: [{ to: USDT_ADDRESS, data: usdtData }, 'latest']
+                    });
+                    document.getElementById('usdtBalance').textContent = (parseInt(usdtBalance, 16) / 1e18).toFixed(2);
+                    
+                    const bnbBalance = await window.ethereum.request({
+                        method: 'eth_getBalance',
+                        params: [userAccount, 'latest']
+                    });
+                    const bnbAmount = (parseInt(bnbBalance, 16) / 1e18).toFixed(4);
+                    document.getElementById('bnbBalance').textContent = bnbAmount;
+                } else {
+                    const usdtContract = new ethers.Contract(
+                        USDT_ADDRESS,
+                        ['function balanceOf(address) view returns (uint256)'],
+                        provider
+                    );
+                    const usdtBal = await usdtContract.balanceOf(userAccount);
+                    document.getElementById('usdtBalance').textContent = ethers.utils.formatEther(usdtBal);
+                    
+                    const bnbBal = await provider.getBalance(userAccount);
+                    document.getElementById('bnbBalance').textContent = ethers.utils.formatEther(bnbBal);
+                }
+            } catch (error) {
+                console.error('Erreur lors de la récupération des balances:', error);
+            }
+        }
+
+        function filterDCACryptos() {
+            const search = document.getElementById('dcaCryptoSearch').value.toLowerCase();
+            const select = document.getElementById('cryptoSelect');
+            for (let i = 1; i < select.options.length; i++) {
+                const option = select.options[i];
+                option.style.display = option.textContent.toLowerCase().includes(search) ? '' : 'none';
+            }
+        }
+
+        function filterSwapFromTokens() {
+            const search = document.getElementById('swapFromSearch').value.toLowerCase();
+            const select = document.getElementById('swapFromToken');
+            for (let i = 1; i < select.options.length; i++) {
+                const option = select.options[i];
+                option.style.display = option.textContent.toLowerCase().includes(search) ? '' : 'none';
+            }
+        }
+
+        function filterSwapToTokens() {
+            const search = document.getElementById('swapToSearch').value.toLowerCase();
+            const select = document.getElementById('swapToToken');
+            for (let i = 1; i < select.options.length; i++) {
+                const option = select.options[i];
+                option.style.display = option.textContent.toLowerCase().includes(search) ? '' : 'none';
+            }
+        }
+
+        function updateDCAType() {
+            dcaType = document.getElementById('dcaTypeSelect').value;
+            
+            if (dcaType === 'sell') {
+                document.getElementById('cryptoSelectLabel').textContent = 'Crypto à vendre';
+                document.getElementById('amountLabel').textContent = 'Montant par vente (Crypto)';
+                document.getElementById('buyNowBtn').innerHTML = '⚡ Vendre Maintenant';
+                document.getElementById('amountInput').value = '0.1';
+            } else {
+                document.getElementById('cryptoSelectLabel').textContent = 'Crypto à acheter';
+                document.getElementById('amountLabel').textContent = 'Montant par achat (USDT)';
+                document.getElementById('buyNowBtn').innerHTML = '⚡ Acheter Maintenant';
+                document.getElementById('amountInput').value = '10';
+            }
+        }
+
+        function loadCryptoLists() {
+            const dcaSelect = document.getElementById('cryptoSelect');
+            dcaSelect.innerHTML = '<option value="">-- Sélectionner --</option>';
+            
+            TOP_20_CRYPTOS.forEach(crypto => {
+                const option = document.createElement('option');
+                option.value = crypto.address;
+                option.textContent = `${crypto.rank}. ${crypto.symbol} - ${crypto.name}`;
+                option.dataset.crypto = JSON.stringify(crypto);
+                dcaSelect.appendChild(option);
+            });
+
+            const swapFromSelect = document.getElementById('swapFromToken');
+            const swapToSelect = document.getElementById('swapToToken');
+            
+            swapFromSelect.innerHTML = '<option value="">-- Sélectionner --</option>';
+            swapToSelect.innerHTML = '<option value="">-- Sélectionner --</option>';
+            
+            TOP_50_SWAP_TOKENS.forEach(token => {
+                const opt1 = document.createElement('option');
+                opt1.value = token.address;
+                opt1.textContent = `${token.rank}. ${token.symbol}`;
+                swapFromSelect.appendChild(opt1);
+
+                const opt2 = document.createElement('option');
+                opt2.value = token.address;
+                opt2.textContent = `${token.rank}. ${token.symbol}`;
+                swapToSelect.appendChild(opt2);
+            });
+        }
+
+        function updateCryptoInfo() {
+            const select = document.getElementById('cryptoSelect');
+            const option = select.options[select.selectedIndex];
+            
+            if (option.value) {
+                selectedCrypto = JSON.parse(option.dataset.crypto);
+                document.getElementById('cryptoInfo').style.display = 'block';
+                document.getElementById('cryptoDescription').textContent = 
+                    dcaType === 'sell' ? 
+                    `Vente ${selectedCrypto.symbol} → USDT` : 
+                    `Achat USDT → ${selectedCrypto.symbol}`;
+            } else {
+                selectedCrypto = null;
+                document.getElementById('cryptoInfo').style.display = 'none';
+            }
+        }
+
+        function executeNowManual() {
+            if (!selectedCrypto) {
+                alert('⚠️ Veuillez sélectionner une crypto');
+                return;
+            }
+            
+            const amount = parseFloat(document.getElementById('amountInput').value);
+            if (!amount || amount <= 0) {
+                alert('⚠️ Montant invalide');
+                return;
+            }
+            
+            const slippage = parseFloat(document.getElementById('slippageInput').value);
+            
+            if (dcaType === 'sell') {
+                executeSale(amount, slippage, selectedCrypto);
+            } else {
+                executePurchase(amount, slippage, selectedCrypto);
+            }
+        }
+
+        async function executePurchase(amount, slippage, crypto) {
+            try {
+                console.log('🚀 Démarrage achat:', amount, 'USDT →', crypto.symbol);
+                
+                let bnbBalance;
+                if (currentMode === 'metamask') {
+                    const bal = await window.ethereum.request({
+                        method: 'eth_getBalance',
+                        params: [userAccount, 'latest']
+                    });
+                    bnbBalance = parseInt(bal, 16) / 1e18;
+                } else {
+                    const bal = await provider.getBalance(userAccount);
+                    bnbBalance = parseFloat(ethers.utils.formatEther(bal));
+                }
+                
+                if (bnbBalance < 0.003) {
+                    alert('❌ Balance BNB insuffisante pour les frais de gas (minimum 0.003 BNB requis)');
+                    return;
+                }
+                
+                const amountWei = BigInt(Math.floor(amount * 1e18));
+                
+                let usdtBalance;
+                if (currentMode === 'metamask') {
+                    const data = '0x70a08231' + userAccount.substring(2).padStart(64, '0');
+                    const bal = await window.ethereum.request({
+                        method: 'eth_call',
+                        params: [{ to: USDT_ADDRESS, data: data }, 'latest']
+                    });
+                    usdtBalance = BigInt(bal);
+                } else {
+                    const contract = new ethers.Contract(
+                        USDT_ADDRESS,
+                        ['function balanceOf(address) view returns (uint256)'],
+                        provider
+                    );
+                    const bal = await contract.balanceOf(userAccount);
+                    usdtBalance = BigInt(bal.toString());
+                }
+                
+                if (usdtBalance < amountWei) {
+                    alert('❌ Balance USDT insuffisante');
+                    return;
+                }
+                
+                const allowanceData = '0xdd62ed3e' + 
+                    userAccount.substring(2).toLowerCase().padStart(64, '0') + 
+                    PANCAKE_ROUTER.substring(2).toLowerCase().padStart(64, '0');
+                
+                let allowance;
+                if (currentMode === 'metamask') {
+                    allowance = await window.ethereum.request({
+                        method: 'eth_call',
+                        params: [{ to: USDT_ADDRESS, data: allowanceData }, 'latest']
+                    });
+                    allowance = BigInt(allowance);
+                } else {
+                    const contract = new ethers.Contract(
+                        USDT_ADDRESS,
+                        ['function allowance(address,address) view returns (uint256)'],
+                        provider
+                    );
+                    const all = await contract.allowance(userAccount, PANCAKE_ROUTER);
+                    allowance = BigInt(all.toString());
+                }
+                
+                if (allowance < amountWei) {
+                    console.log('📝 Approbation USDT requise...');
+                    
+                    if (currentMode === 'metamask') {
+                        const maxApproval = 'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
+                        const approveData = '0x095ea7b3' + 
+                            PANCAKE_ROUTER.substring(2).toLowerCase().padStart(64, '0') + 
+                            maxApproval;
+                        
+                        await window.ethereum.request({
+                            method: 'eth_sendTransaction',
+                            params: [{
+                                from: userAccount,
+                                to: USDT_ADDRESS,
+                                data: approveData,
+                                gas: '0x186A0'
+                            }]
+                        });
+                        
+                        alert('✅ Approbation envoyée! Attendez 10 secondes...');
+                        await new Promise(r => setTimeout(r, 10000));
+                    } else {
+                        const contract = new ethers.Contract(
+                            USDT_ADDRESS,
+                            ['function approve(address,uint256) returns (bool)'],
+                            privateKeyWallet
+                        );
+                        const tx = await contract.approve(PANCAKE_ROUTER, ethers.constants.MaxUint256);
+                        await tx.wait();
+                        console.log('✅ Approbation automatique effectuée');
+                    }
+                }
+                
+                const path = [USDT_ADDRESS, crypto.address];
+                const quoteData = '0xd06ca61f' +
+                    amountWei.toString(16).padStart(64, '0') +
+                    '0000000000000000000000000000000000000000000000000000000000000040' +
+                    '0000000000000000000000000000000000000000000000000000000000000002' +
+                    USDT_ADDRESS.substring(2).toLowerCase().padStart(64, '0') +
+                    crypto.address.substring(2).toLowerCase().padStart(64, '0');
+                
+                let quoteResult;
+                if (currentMode === 'metamask') {
+                    quoteResult = await window.ethereum.request({
+                        method: 'eth_call',
+                        params: [{ to: PANCAKE_ROUTER, data: quoteData }, 'latest']
+                    });
+                } else {
+                    quoteResult = await provider.call({
+                        to: PANCAKE_ROUTER,
+                        data: quoteData
+                    });
+                }
+                
+                const resultHex = quoteResult.substring(2);
+                const amountOut = BigInt('0x' + resultHex.substring(192, 256));
+                const amountOutMin = BigInt(Math.floor(Number(amountOut) * (1 - Math.max(slippage, 3)/100)));
+                
+                if (currentMode === 'metamask') {
+                    if (!confirm(`Confirmer l'achat?\n\n${amount} USDT → ~${(Number(amountOut)/1e18).toFixed(6)} ${crypto.symbol}`)) {
+                        return;
+                    }
+                }
+                
+                const deadline = Math.floor(Date.now()/1000) + 1200;
+                const userAddr = userAccount.substring(2).toLowerCase().padStart(64, '0');
+                
+                let swapData;
+                if (crypto.address.toLowerCase() === WBNB_ADDRESS.toLowerCase()) {
+                    swapData = '0x18cbafe5' + 
+                        amountWei.toString(16).padStart(64, '0') +
+                        amountOutMin.toString(16).padStart(64, '0') +
+                        '00000000000000000000000000000000000000000000000000000000000000a0' +
+                        userAddr +
+                        deadline.toString(16).padStart(64, '0') +
+                        '0000000000000000000000000000000000000000000000000000000000000002' +
+                        USDT_ADDRESS.substring(2).toLowerCase().padStart(64, '0') +
+                        WBNB_ADDRESS.substring(2).toLowerCase().padStart(64, '0');
+                } else {
+                    swapData = '0x38ed1739' +
+                        amountWei.toString(16).padStart(64, '0') +
+                        amountOutMin.toString(16).padStart(64, '0') +
+                        '00000000000000000000000000000000000000000000000000000000000000a0' +
+                        userAddr +
+                        deadline.toString(16).padStart(64, '0') +
+                        '0000000000000000000000000000000000000000000000000000000000000002' +
+                        USDT_ADDRESS.substring(2).toLowerCase().padStart(64, '0') +
+                        crypto.address.substring(2).toLowerCase().padStart(64, '0');
+                }
+                
+                let swapTx;
+                if (currentMode === 'metamask') {
+                    swapTx = await window.ethereum.request({
+                        method: 'eth_sendTransaction',
+                        params: [{
+                            from: userAccount,
+                            to: PANCAKE_ROUTER,
+                            data: swapData,
+                            gas: '0x7A120'
+                        }]
+                    });
+                } else {
+                    const tx = await privateKeyWallet.sendTransaction({
+                        to: PANCAKE_ROUTER,
+                        data: swapData,
+                        gasLimit: 500000
+                    });
+                    await tx.wait();
+                    swapTx = tx.hash;
+                }
+                
+                console.log('✅ Transaction réussie:', swapTx);
+                
+                dcaConfig.stats.totalBuys++;
+                dcaConfig.stats.totalInvested += amount;
+                dcaConfig.stats.totalTokens += Number(amountOut) / 1e18;
+                
+                updateDCAStatus();
+                await updateBalances();
+                
+                addToHistory({
+                    type: 'success',
+                    crypto: crypto.symbol,
+                    amount: amount,
+                    txHash: swapTx,
+                    date: new Date()
+                });
+                
+                if (currentMode === 'metamask') {
+                    alert(`✅ Achat réussi!\n\nHash: ${swapTx.substring(0,10)}...`);
+                }
+                
+            } catch (error) {
+                console.error('❌ Erreur lors de l'achat:', error);
+                const msg = error.message || 'Erreur inconnue';
+                
+                addToHistory({
+                    type: 'failed',
+                    crypto: crypto?.symbol || '?',
+                    amount: amount,
+                    error: msg,
+                    date: new Date()
+                });
+                
+                if (currentMode === 'metamask') {
+                    alert('❌ Erreur: ' + msg);
+                }
+            }
+        }
+
+        async function executeSale(amount, slippage, crypto) {
+            try {
+                console.log('🚀 Démarrage vente:', amount, crypto.symbol, '→ USDT');
+                
+                let bnbBalance;
+                if (currentMode === 'metamask') {
+                    const bal = await window.ethereum.request({
+                        method: 'eth_getBalance',
+                        params: [userAccount, 'latest']
+                    });
+                    bnbBalance = parseInt(bal, 16) / 1e18;
+                } else {
+                    const bal = await provider.getBalance(userAccount);
+                    bnbBalance = parseFloat(ethers.utils.formatEther(bal));
+                }
+                
+                if (bnbBalance < 0.003) {
+                    alert('❌ Balance BNB insuffisante pour les frais de gas (minimum 0.003 BNB requis)');
+                    return;
+                }
+                
+                const amountWei = BigInt(Math.floor(amount * 1e18));
+                const isWBNB = crypto.address.toLowerCase() === WBNB_ADDRESS.toLowerCase();
+                
+                let cryptoBalance;
+                if (isWBNB) {
+                    cryptoBalance = BigInt(Math.floor(bnbBalance * 1e18));
+                } else {
+                    if (currentMode === 'metamask') {
+                        const data = '0x70a08231' + userAccount.substring(2).padStart(64, '0');
+                        const bal = await window.ethereum.request({
+                            method: 'eth_call',
+                            params: [{ to: crypto.address, data: data }, 'latest']
+                        });
+                        cryptoBalance = BigInt(bal);
+                    } else {
+                        const contract = new ethers.Contract(
+                            crypto.address,
+                            ['function balanceOf(address) view returns (uint256)'],
+                            provider
+                        );
+                        const bal = await contract.balanceOf(userAccount);
+                        cryptoBalance = BigInt(bal.toString());
+                    }
+                }
+                
+                if (cryptoBalance < amountWei) {
+                    alert(`❌ Balance ${crypto.symbol} insuffisante`);
+                    return;
+                }
+                
+                if (!isWBNB) {
+                    const allowanceData = '0xdd62ed3e' + 
+                        userAccount.substring(2).toLowerCase().padStart(64, '0') + 
+                        PANCAKE_ROUTER.substring(2).toLowerCase().padStart(64, '0');
+                    
+                    let allowance;
+                    if (currentMode === 'metamask') {
+                        allowance = await window.ethereum.request({
+                            method: 'eth_call',
+                            params: [{ to: crypto.address, data: allowanceData }, 'latest']
+                        });
+                        allowance = BigInt(allowance);
+                    } else {
+                        const contract = new ethers.Contract(
+                            crypto.address,
+                            ['function allowance(address,address) view returns (uint256)'],
+                            provider
+                        );
+                        const all = await contract.allowance(userAccount, PANCAKE_ROUTER);
+                        allowance = BigInt(all.toString());
+                    }
+                    
+                    if (allowance < amountWei) {
+                        console.log('📝 Approbation', crypto.symbol, 'requise...');
+                        
+                        if (currentMode === 'metamask') {
+                            const maxApproval = 'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
+                            const approveData = '0x095ea7b3' + 
+                                PANCAKE_ROUTER.substring(2).toLowerCase().padStart(64, '0') + 
+                                maxApproval;
+                            
+                            await window.ethereum.request({
+                                method: 'eth_sendTransaction',
+                                params: [{
+                                    from: userAccount,
+                                    to: crypto.address,
+                                    data: approveData,
+                                    gas: '0x186A0'
+                                }]
+                            });
+                            
+                            alert('✅ Approbation envoyée! Attendez 10 secondes...');
+                            await new Promise(r => setTimeout(r, 10000));
+                        } else {
+                            const contract = new ethers.Contract(
+                                crypto.address,
+                                ['function approve(address,uint256) returns (bool)'],
+                                privateKeyWallet
+                            );
+                            const tx = await contract.approve(PANCAKE_ROUTER, ethers.constants.MaxUint256);
+                            await tx.wait();
+                            console.log('✅ Approbation automatique effectuée');
+                        }
+                    }
+                }
+                
+                const path = [crypto.address, USDT_ADDRESS];
+                const quoteData = '0xd06ca61f' +
+                    amountWei.toString(16).padStart(64, '0') +
+                    '0000000000000000000000000000000000000000000000000000000000000040' +
+                    '0000000000000000000000000000000000000000000000000000000000000002' +
+                    crypto.address.substring(2).toLowerCase().padStart(64, '0') +
+                    USDT_ADDRESS.substring(2).toLowerCase().padStart(64, '0');
+                
+                let quoteResult;
+                if (currentMode === 'metamask') {
+                    quoteResult = await window.ethereum.request({
+                        method: 'eth_call',
+                        params: [{ to: PANCAKE_ROUTER, data: quoteData }, 'latest']
+                    });
+                } else {
+                    quoteResult = await provider.call({
+                        to: PANCAKE_ROUTER,
+                        data: quoteData
+                    });
+                }
+                
+                const resultHex = quoteResult.substring(2);
+                const amountOut = BigInt('0x' + resultHex.substring(192, 256));
+                const amountOutMin = BigInt(Math.floor(Number(amountOut) * (1 - Math.max(slippage, 3)/100)));
+                
+                if (currentMode === 'metamask') {
+                    if (!confirm(`Confirmer la vente?\n\n${amount} ${crypto.symbol} → ~${(Number(amountOut)/1e18).toFixed(2)} USDT`)) {
+                        return;
+                    }
+                }
+                
+                const deadline = Math.floor(Date.now()/1000) + 1200;
+                const userAddr = userAccount.substring(2).toLowerCase().padStart(64, '0');
+                
+                let swapData, swapValue = '0x0';
+                
+                if (isWBNB) {
+                    const bnbPath = [WBNB_ADDRESS, USDT_ADDRESS];
+                    const pathEncoded = bnbPath.map(a => a.substring(2).toLowerCase().padStart(64, '0')).join('');
+                    
+                    swapData = '0xb6f9de95' +
+                        amountOutMin.toString(16).padStart(64, '0') +
+                        '0000000000000000000000000000000000000000000000000000000000000080' +
+                        userAddr +
+                        deadline.toString(16).padStart(64, '0') +
+                        '0000000000000000000000000000000000000000000000000000000000000002' +
+                        pathEncoded;
+                    swapValue = '0x' + amountWei.toString(16);
+                } else {
+                    swapData = '0x5c11d795' +
+                        amountWei.toString(16).padStart(64, '0') +
+                        amountOutMin.toString(16).padStart(64, '0') +
+                        '00000000000000000000000000000000000000000000000000000000000000a0' +
+                        userAddr +
+                        deadline.toString(16).padStart(64, '0') +
+                        '0000000000000000000000000000000000000000000000000000000000000002' +
+                        crypto.address.substring(2).toLowerCase().padStart(64, '0') +
+                        USDT_ADDRESS.substring(2).toLowerCase().padStart(64, '0');
+                }
+                
+                let swapTx;
+                if (currentMode === 'metamask') {
+                    swapTx = await window.ethereum.request({
+                        method: 'eth_sendTransaction',
+                        params: [{
+                            from: userAccount,
+                            to: PANCAKE_ROUTER,
+                            data: swapData,
+                            gas: isWBNB ? '0xC3500' : '0x91630',
+                            value: swapValue
+                        }]
+                    });
+                } else {
+                    const tx = await privateKeyWallet.sendTransaction({
+                        to: PANCAKE_ROUTER,
+                        data: swapData,
+                        gasLimit: isWBNB ? 800000 : 600000,
+                        value: swapValue
+                    });
+                    await tx.wait();
+                    swapTx = tx.hash;
+                }
+                
+                console.log('✅ Transaction réussie:', swapTx);
+                
+                dcaConfig.stats.totalBuys++;
+                dcaConfig.stats.totalInvested += Number(amountOut) / 1e18;
+                dcaConfig.stats.totalTokens += amount;
+                
+                updateDCAStatus();
+                await updateBalances();
+                
+                addToHistory({
+                    type: 'success',
+                    crypto: `${crypto.symbol} → USDT`,
+                    amount: amount,
+                    txHash: swapTx,
+                    date: new Date()
+                });
+                
+                if (currentMode === 'metamask') {
+                    alert(`✅ Vente réussie!\n\nHash: ${swapTx.substring(0,10)}...`);
+                }
+                
+            } catch (error) {
+                console.error('❌ Erreur lors de la vente:', error);
+                const msg = error.message || 'Erreur inconnue';
+                
+                addToHistory({
+                    type: 'failed',
+                    crypto: `${crypto?.symbol || '?'} → USDT`,
+                    amount: amount,
+                    error: msg,
+                    date: new Date()
+                });
+                
+                if (currentMode === 'metamask') {
+                    alert('❌ Erreur: ' + msg);
+                }
+            }
+        }
+
+        function startDCA() {
+            if (!selectedCrypto) {
+                alert('⚠️ Veuillez sélectionner une crypto');
+                return;
+            }
+            
+            const amount = parseFloat(document.getElementById('amountInput').value);
+            const interval = parseInt(document.getElementById('intervalSelect').value);
+            const slippage = parseFloat(document.getElementById('slippageInput').value);
+            
+            if (!amount || amount <= 0) {
+                alert('⚠️ Montant invalide');
+                return;
+            }
+            
+            dcaConfig = {
+                active: true,
+                type: dcaType,
+                crypto: selectedCrypto,
+                amount: amount,
+                interval: interval,
+                slippage: slippage,
+                nextRun: Date.now() + interval * 1000,
+                stats: dcaConfig.stats
+            };
+            
+            updateDCAStatus();
+            
+            document.getElementById('startDcaBtn').style.display = 'none';
+            document.getElementById('stopDcaBtn').style.display = 'block';
+            
+            dcaInterval = setInterval(checkAndExecuteDCA, 5000);
+            
+            alert(`🚀 DCA démarré!\n\n${currentMode === 'privatekey' ? 'Mode automatique - Les transactions s\'exécuteront sans confirmation' : 'Mode MetaMask - Vous devrez confirmer chaque transaction'}`);
+        }
+
+        function stopDCA() {
+            dcaConfig.active = false;
+            clearInterval(dcaInterval);
+            
+            document.getElementById('startDcaBtn').style.display = 'block';
+            document.getElementById('stopDcaBtn').style.display = 'none';
+            document.getElementById('dcaStatus').textContent = 'Inactif';
+            
+            alert('⏸️ DCA arrêté');
+        }
+
+        function checkAndExecuteDCA() {
+            if (!dcaConfig.active) return;
+            
+            const now = Date.now();
+            const timeUntilNext = dcaConfig.nextRun - now;
+            
+            if (timeUntilNext <= 0) {
+                if (dcaConfig.type === 'sell') {
+                    executeSale(dcaConfig.amount, dcaConfig.slippage, dcaConfig.crypto);
+                } else {
+                    executePurchase(dcaConfig.amount, dcaConfig.slippage, dcaConfig.crypto);
+                }
+                dcaConfig.nextRun = now + dcaConfig.interval * 1000;
+            }
+            
+            const seconds = Math.floor(timeUntilNext / 1000);
+            const minutes = Math.floor(seconds / 60);
+            const hours = Math.floor(minutes / 60);
+            
+            let timeText;
+            if (hours > 0) {
+                timeText = `${hours}h ${minutes % 60}m`;
+            } else if (minutes > 0) {
+                timeText = `${minutes}m ${seconds % 60}s`;
+            } else {
+                timeText = `${seconds}s`;
+            }
+            
+            document.getElementById('nextExecution').textContent = timeText;
+        }
+
+        function updateDCAStatus() {
+            const type = dcaConfig.type === 'sell' ? 'Vente' : 'Achat';
+            document.getElementById('currentAmount').textContent = dcaConfig.amount ? 
+                `${dcaConfig.amount} ${dcaConfig.type === 'sell' ? dcaConfig.crypto?.symbol : 'USDT'} (${type})` : '-';
+            
+            const intervalText = {
+                '3600': 'Toutes les heures',
+                '21600': '6 heures',
+                '43200': '12 heures',
+                '86400': '1 jour',
+                '604800': '1 semaine'
+            };
+            
+            document.getElementById('currentInterval').textContent = intervalText[dcaConfig.interval] || '-';
+            document.getElementById('dcaStatus').textContent = dcaConfig.active ? '🟢 Actif' : '🔴 Inactif';
+            document.getElementById('totalBuys').textContent = dcaConfig.stats.totalBuys;
+            document.getElementById('totalInvested').textContent = `${dcaConfig.stats.totalInvested.toFixed(2)} USDT`;
+            document.getElementById('totalTokens').textContent = `${dcaConfig.stats.totalTokens.toFixed(6)}`;
+        }
+
+        async function updateSwapBalance() {
+            const fromToken = document.getElementById('swapFromToken').value;
+            if (!fromToken || !userAccount) return;
+            
+            try {
+                const isFromBNB = fromToken.toLowerCase() === WBNB_ADDRESS.toLowerCase();
+                let balance;
+                
+                if (isFromBNB) {
+                    if (currentMode === 'metamask') {
+                        const bal = await window.ethereum.request({
+                            method: 'eth_getBalance',
+                            params: [userAccount, 'latest']
+                        });
+                        balance = (parseInt(bal, 16) / 1e18).toFixed(4);
+                    } else {
+                        const bal = await provider.getBalance(userAccount);
+                        balance = parseFloat(ethers.utils.formatEther(bal)).toFixed(4);
+                    }
+                } else {
+                    if (currentMode === 'metamask') {
+                        const data = '0x70a08231' + userAccount.substring(2).padStart(64, '0');
+                        const bal = await window.ethereum.request({
+                            method: 'eth_call',
+                            params: [{ to: fromToken, data: data }, 'latest']
+                        });
+                        balance = (parseInt(bal, 16) / 1e18).toFixed(4);
+                    } else {
+                        const contract = new ethers.Contract(
+                            fromToken,
+                            ['function balanceOf(address) view returns (uint256)'],
+                            provider
+                        );
+                        const bal = await contract.balanceOf(userAccount);
+                        balance = parseFloat(ethers.utils.formatEther(bal)).toFixed(4);
+                    }
+                }
+                
+                document.getElementById('swapFromBalance').textContent = balance;
+            } catch (error) {
+                console.error('Erreur récupération balance:', error);
+                document.getElementById('swapFromBalance').textContent = '0';
+            }
+        }
+
+        function switchSwapTokens() {
+            const from = document.getElementById('swapFromToken');
+            const to = document.getElementById('swapToToken');
+            const temp = from.value;
+            from.value = to.value;
+            to.value = temp;
+            updateSwapBalance();
+        }
+
+        async function getSwapEstimate() {
+            const fromToken = document.getElementById('swapFromToken').value;
+            const toToken = document.getElementById('swapToToken').value;
+            const amount = parseFloat(document.getElementById('swapAmount').value);
+
+            if (!fromToken || !toToken) {
+                alert('⚠️ Veuillez sélectionner les deux tokens');
+                return;
+            }
+
+            if (fromToken === toToken) {
+                alert('⚠️ Les tokens doivent être différents');
+                return;
+            }
+
+            if (!amount || amount <= 0) {
+                alert('⚠️ Montant invalide');
+                return;
+            }
+
+            try {
+                const amountWei = BigInt(Math.floor(amount * 1e18));
+                
+                const isFromBNB = fromToken.toLowerCase() === WBNB_ADDRESS.toLowerCase();
+                const isToBNB = toToken.toLowerCase() === WBNB_ADDRESS.toLowerCase();
+                
+                let path;
+                if (isFromBNB || isToBNB) {
+                    path = [fromToken, toToken];
+                } else {
+                    path = [fromToken, WBNB_ADDRESS, toToken];
+                }
+
+                let pathEncoded = path.map(addr => addr.substring(2).toLowerCase().padStart(64, '0')).join('');
+                
+                const quoteData = '0xd06ca61f' +
+                    amountWei.toString(16).padStart(64, '0') +
+                    '0000000000000000000000000000000000000000000000000000000000000040' +
+                    path.length.toString(16).padStart(64, '0') +
+                    pathEncoded;
+
+                let quoteResult;
+                if (currentMode === 'metamask') {
+                    quoteResult = await window.ethereum.request({
+                        method: 'eth_call',
+                        params: [{ to: PANCAKE_ROUTER, data: quoteData }, 'latest']
+                    });
+                } else {
+                    quoteResult = await provider.call({
+                        to: PANCAKE_ROUTER,
+                        data: quoteData
+                    });
+                }
+
+                const resultHex = quoteResult.substring(2);
+                const offset = parseInt(resultHex.substring(0, 64), 16) * 2;
+                const arrayLength = parseInt(resultHex.substring(offset, offset + 64), 16);
+                const lastIndex = offset + 64 + (arrayLength - 1) * 64;
+                const amountOut = BigInt('0x' + resultHex.substring(lastIndex, lastIndex + 64));
+
+                swapEstimateAmount = amountOut;
+                const estimateDisplay = (Number(amountOut) / 1e18).toFixed(6);
+                const fromName = getTokenName(fromToken);
+                const toName = getTokenName(toToken);
+                
+                document.getElementById('swapEstimate').value = estimateDisplay + ' ' + toName;
+
+                const rate = (Number(amountOut) / 1e18) / amount;
+                alert(`💰 Estimation du prix:\n\n${amount} ${fromName} = ${estimateDisplay} ${toName}\n\nTaux: 1 ${fromName} = ${rate.toFixed(6)} ${toName}`);
+
+            } catch (error) {
+                console.error('Erreur estimation:', error);
+                alert('❌ Erreur lors de l\'estimation du prix');
+            }
+        }
+
+        function getTokenName(address) {
+            const token = TOP_50_SWAP_TOKENS.find(t => t.address.toLowerCase() === address.toLowerCase());
+            return token ? token.symbol : 'Unknown';
+        }
+
+        async function executeSwap() {
+            const fromToken = document.getElementById('swapFromToken').value;
+            const toToken = document.getElementById('swapToToken').value;
+            const amount = parseFloat(document.getElementById('swapAmount').value);
+            const slippage = parseFloat(document.getElementById('swapSlippage').value);
+
+            if (!fromToken || !toToken) {
+                alert('⚠️ Veuillez sélectionner les tokens');
+                return;
+            }
+
+            if (fromToken === toToken) {
+                alert('⚠️ Les tokens doivent être différents');
+                return;
+            }
+
+            if (!amount || amount <= 0) {
+                alert('⚠️ Montant invalide');
+                return;
+            }
+
+            if (swapEstimateAmount === 0) {
+                alert('⚠️ Veuillez d\'abord obtenir le prix');
+                return;
+            }
+
+            try {
+                const amountWei = BigInt(Math.floor(amount * 1e18));
+                const isFromBNB = fromToken.toLowerCase() === WBNB_ADDRESS.toLowerCase();
+                const isToBNB = toToken.toLowerCase() === WBNB_ADDRESS.toLowerCase();
+
+                let balance;
+                if (isFromBNB) {
+                    if (currentMode === 'metamask') {
+                        const bal = await window.ethereum.request({
+                            method: 'eth_getBalance',
+                            params: [userAccount, 'latest']
+                        });
+                        balance = BigInt(bal);
+                    } else {
+                        const bal = await provider.getBalance(userAccount);
+                        balance = BigInt(bal.toString());
+                    }
+                    
+                    const minKeep = BigInt(Math.floor(0.003 * 1e18));
+                    if (balance < amountWei + minKeep) {
+                        alert('❌ Balance BNB insuffisante! Gardez au moins 0.003 BNB pour les frais.');
+                        return;
+                    }
+                } else {
+                    if (currentMode === 'metamask') {
+                        const data = '0x70a08231' + userAccount.substring(2).padStart(64, '0');
+                        const bal = await window.ethereum.request({
+                            method: 'eth_call',
+                            params: [{ to: fromToken, data: data }, 'latest']
+                        });
+                        balance = BigInt(bal);
+                    } else {
+                        const contract = new ethers.Contract(
+                            fromToken,
+                            ['function balanceOf(address) view returns (uint256)'],
+                            provider
+                        );
+                        const bal = await contract.balanceOf(userAccount);
+                        balance = BigInt(bal.toString());
+                    }
+                    
+                    if (balance < amountWei) {
+                        alert('❌ Balance insuffisante!');
+                        return;
+                    }
+                }
+
+                if (!isFromBNB) {
+                    const allowanceData = '0xdd62ed3e' + 
+                        userAccount.substring(2).toLowerCase().padStart(64, '0') + 
+                        PANCAKE_ROUTER.substring(2).toLowerCase().padStart(64, '0');
+                    
+                    let allowance;
+                    if (currentMode === 'metamask') {
+                        allowance = await window.ethereum.request({
+                            method: 'eth_call',
+                            params: [{ to: fromToken, data: allowanceData }, 'latest']
+                        });
+                        allowance = BigInt(allowance);
+                    } else {
+                        const contract = new ethers.Contract(
+                            fromToken,
+                            ['function allowance(address,address) view returns (uint256)'],
+                            provider
+                        );
+                        const all = await contract.allowance(userAccount, PANCAKE_ROUTER);
+                        allowance = BigInt(all.toString());
+                    }
+                    
+                    if (allowance < amountWei) {
+                        if (currentMode === 'metamask') {
+                            if (!confirm('Autoriser PancakeSwap à utiliser vos tokens?')) {
+                                return;
+                            }
+                            
+                            const maxApproval = 'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
+                            const approveData = '0x095ea7b3' + 
+                                PANCAKE_ROUTER.substring(2).toLowerCase().padStart(64, '0') + 
+                                maxApproval;
+                            
+                            await window.ethereum.request({
+                                method: 'eth_sendTransaction',
+                                params: [{
+                                    from: userAccount,
+                                    to: fromToken,
+                                    data: approveData,
+                                    gas: '0x186A0'
+                                }]
+                            });
+                            
+                            alert('✅ Approbation envoyée! Attendez 10 secondes...');
+                            await new Promise(r => setTimeout(r, 10000));
+                        } else {
+                            const contract = new ethers.Contract(
+                                fromToken,
+                                ['function approve(address,uint256) returns (bool)'],
+                                privateKeyWallet
+                            );
+                            const tx = await contract.approve(PANCAKE_ROUTER, ethers.constants.MaxUint256);
+                            await tx.wait();
+                            console.log('✅ Approbation automatique effectuée');
+                        }
+                    }
+                }
+
+                const safeSlippage = Math.max(slippage, 2);
+                const amountOutMin = BigInt(Math.floor(Number(swapEstimateAmount) * (1 - safeSlippage/100)));
+
+                const fromName = getTokenName(fromToken);
+                const toName = getTokenName(toToken);
+
+                if (currentMode === 'metamask') {
+                    if (!confirm(`Confirmer le swap?\n\n${amount} ${fromName} → ~${(Number(swapEstimateAmount)/1e18).toFixed(6)} ${toName}`)) {
+                        return;
+                    }
+                }
+
+                let path;
+                if (isFromBNB || isToBNB) {
+                    path = [fromToken, toToken];
+                } else {
+                    path = [fromToken, WBNB_ADDRESS, toToken];
+                }
+
+                const deadline = Math.floor(Date.now()/1000) + 1200;
+                const userAddr = userAccount.substring(2).toLowerCase().padStart(64, '0');
+                
+                let swapData, swapValue = '0x0';
+                
+                if (isFromBNB) {
+                    const bnbPath = [WBNB_ADDRESS, toToken];
+                    const pathEncoded = bnbPath.map(a => a.substring(2).toLowerCase().padStart(64, '0')).join('');
+                    
+                    swapData = '0xb6f9de95' +
+                        amountOutMin.toString(16).padStart(64, '0') +
+                        '0000000000000000000000000000000000000000000000000000000000000080' +
+                        userAddr +
+                        deadline.toString(16).padStart(64, '0') +
+                        '0000000000000000000000000000000000000000000000000000000000000002' +
+                        pathEncoded;
+                    swapValue = '0x' + amountWei.toString(16);
+                } else if (isToBNB) {
+                    const bnbPath = [fromToken, WBNB_ADDRESS];
+                    const pathEncoded = bnbPath.map(a => a.substring(2).toLowerCase().padStart(64, '0')).join('');
+                    
+                    swapData = '0x791ac947' +
+                        amountWei.toString(16).padStart(64, '0') +
+                        amountOutMin.toString(16).padStart(64, '0') +
+                        '00000000000000000000000000000000000000000000000000000000000000a0' +
+                        userAddr +
+                        deadline.toString(16).padStart(64, '0') +
+                        '0000000000000000000000000000000000000000000000000000000000000002' +
+                        pathEncoded;
+                } else {
+                    const pathEncoded = path.map(a => a.substring(2).toLowerCase().padStart(64, '0')).join('');
+                    swapData = '0x5c11d795' +
+                        amountWei.toString(16).padStart(64, '0') +
+                        amountOutMin.toString(16).padStart(64, '0') +
+                        '00000000000000000000000000000000000000000000000000000000000000a0' +
+                        userAddr +
+                        deadline.toString(16).padStart(64, '0') +
+                        path.length.toString(16).padStart(64, '0') +
+                        pathEncoded;
+                }
+
+                let gasEstimate;
+                if (isFromBNB) {
+                    gasEstimate = currentMode === 'metamask' ? '0xC3500' : 800000;
+                } else if (isToBNB) {
+                    gasEstimate = currentMode === 'metamask' ? '0xAA690' : 700000;
+                } else {
+                    gasEstimate = currentMode === 'metamask' ? '0x91630' : 600000;
+                }
+
+                let swapTx;
+                if (currentMode === 'metamask') {
+                    swapTx = await window.ethereum.request({
+                        method: 'eth_sendTransaction',
+                        params: [{
+                            from: userAccount,
+                            to: PANCAKE_ROUTER,
+                            data: swapData,
+                            gas: gasEstimate,
+                            value: swapValue
+                        }]
+                    });
+                } else {
+                    const tx = await privateKeyWallet.sendTransaction({
+                        to: PANCAKE_ROUTER,
+                        data: swapData,
+                        gasLimit: gasEstimate,
+                        value: swapValue
+                    });
+                    await tx.wait();
+                    swapTx = tx.hash;
+                }
+
+                console.log('✅ Transaction réussie:', swapTx);
+                
+                await updateBalances();
+                
+                addToHistory({
+                    type: 'success',
+                    crypto: `${fromName} → ${toName}`,
+                    amount: amount,
+                    txHash: swapTx,
+                    date: new Date()
+                });
+
+                if (currentMode === 'metamask') {
+                    alert(`✅ Swap réussi!\n\nHash: ${swapTx.substring(0,10)}...`);
+                }
+                
+                document.getElementById('swapEstimate').value = '';
+                swapEstimateAmount = 0;
+
+            } catch (error) {
+                console.error('Erreur lors du swap:', error);
+                
+                const msg = error.message || 'Erreur inconnue';
+                const fromName = getTokenName(fromToken);
+                const toName = getTokenName(toToken);
+                
+                addToHistory({
+                    type: 'failed',
+                    crypto: `${fromName} → ${toName}`,
+                    amount: amount,
+                    error: msg,
+                    date: new Date()
+                });
+                
+                if (currentMode === 'metamask') {
+                    alert('❌ Erreur: ' + msg);
+                }
+            }
+        }
+
+        function addToHistory(entry) {
+            history.unshift(entry);
+            
+            const container = document.getElementById('historyContainer');
+            const historyClass = entry.type === 'success' ? 'success' : 'failed';
+            
+            const historyItem = document.createElement('div');
+            historyItem.className = `history-item ${historyClass}`;
+            historyItem.innerHTML = `
+                <div style="font-size: 0.85em; color: #666; margin-bottom: 5px;">
+                    ${entry.date.toLocaleString('fr-FR')}
+                </div>
+                <div style="font-size: 0.95em; color: #333;">
+                    <strong>${entry.type === 'success' ? '✅' : '❌'} ${entry.crypto}</strong> - ${entry.amount.toFixed(4)}
+                    ${entry.type === 'success' ? 
+                        `<br><a href="https://bscscan.com/tx/${entry.txHash}" target="_blank" style="color: #667eea; text-decoration: none;">Voir sur BSCScan →</a>` : 
+                        `<br><span style="color: #c00;">${entry.error}</span>`
+                    }
+                </div>
+            `;
+            
+            if (history.length === 1) {
+                container.innerHTML = '';
+            }
+            
+            container.insertBefore(historyItem, container.firstChild);
+            
+            if (history.length > 20) {
+                history.pop();
+                container.removeChild(container.lastChild);
+            }
+        }
+
+        window.addEventListener('load', () => {
+            if (typeof window.ethereum === 'undefined') {
+                document.getElementById('connectBtn').disabled = true;
+                document.getElementById('connectBtn').textContent = 'MetaMask non installé';
+            }
+        });
+    </script>
+</body>
+</html>
